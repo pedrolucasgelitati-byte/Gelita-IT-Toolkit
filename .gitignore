@@ -1,0 +1,84 @@
+# .gitignore para Gelita Printer & Scanner Installer
+
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.vcxproj.filters
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Build Results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Rider
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Test Results
+TestResults/
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Application Logs (exclude generated logs)
+Logs/*.log
+Logs/*.txt
+
+# IDE
+.editorconfig
+!.editorconfig
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Output directories
+out/
+dist/
+publish/
+
+# Local environment variables
+.env
+.env.local
+local.settings.json

@@ -1,0 +1,30 @@
+{
+  "units": [
+    {
+      "name": "Maringá",
+      "printServer": "\\\\br-mga1-srv013v",
+      "printers": [
+        "MG_PRINTER_224",
+        "MG_PRINTER_225",
+        "MG_PRINTER_226"
+      ]
+    },
+    {
+      "name": "Cotia",
+      "printServer": "\\\\br-coa1-srv013v",
+      "printers": [
+        "CT_PRINTER_101",
+        "CT_PRINTER_102"
+      ]
+    },
+    {
+      "name": "Mococa",
+      "printServer": "\\\\br-mco1-srv013v",
+      "printers": [
+        "MC_PRINTER_001",
+        "MC_PRINTER_002",
+        "MC_PRINTER_003"
+      ]
+    }
+  ]
+}

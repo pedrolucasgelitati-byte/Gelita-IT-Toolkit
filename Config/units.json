@@ -1,0 +1,19 @@
+{
+  "units": [
+    {
+      "name": "Maringá",
+      "location": "Paraná",
+      "contact": "Gerente Local"
+    },
+    {
+      "name": "Cotia",
+      "location": "São Paulo",
+      "contact": "Gerente Local"
+    },
+    {
+      "name": "Mococa",
+      "location": "São Paulo",
+      "contact": "Gerente Local"
+    }
+  ]
+}
