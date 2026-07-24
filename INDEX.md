@@ -238,7 +238,7 @@ Escolha sua função e siga o caminho recomendado:
 - 🏗️ Design: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ### Configuração
-- ⚙️ Projeto: [GelitaInstaller.csproj](GelitaInstaller.csproj)
+- ⚙️ Projeto: [Gelita-IT-Toolkit.csproj](Gelita-IT-Toolkit.csproj)
 - 📝 JSON: [Config/](Config/)
 - 🔧 App: [Program.cs](Program.cs)
 
@@ -279,7 +279,7 @@ Código
 └── Config/ ................ Configuração
 
 Projeto
-├── GelitaInstaller.csproj . Arquivo projeto
+├── Gelita-IT-Toolkit.csproj . Arquivo projeto
 ├── Program.cs ............. Entrada
 └── .gitignore ............. Git config
 ```

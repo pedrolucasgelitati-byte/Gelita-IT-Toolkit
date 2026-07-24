@@ -1,4 +1,4 @@
-# Guia de Desenvolvimento - Gelita Printer & Scanner Installer
+# Guia de Desenvolvimento - Gelita IT Toolkit
 
 ## Visão Geral
 
@@ -108,7 +108,7 @@ private Dictionary<string, object> _configCache = new();
 ✔ ClearLog() - Limpar arquivo de log
 ```
 
-**Padrão de arquivo:** `Logs/GelitaInstaller_YYYYMMDD_HHMMSS.log`
+**Padrão de arquivo:** `Logs/GelitaITToolkit_YYYYMMDD_HHMMSS.log`
 
 #### 3.3 NetworkService.cs
 **Dependências:** ProcessHelper, LoggerService
@@ -279,7 +279,7 @@ Após cada fase, o projeto deve:
 ## Dependências NuGet
 
 ```xml
-<!-- Já configurado em GelitaInstaller.csproj -->
+<!-- Já configurado em Gelita-IT-Toolkit.csproj -->
 <PackageReference Include="System.Text.Json" Version="8.0.0" />
 <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
 <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />

@@ -182,7 +182,7 @@ installerprinters/
 ├── Services/
 │   └── ConfigService.cs     ✅ IMPLEMENTADO
 └── bin/Debug/
-    └── GelitaInstaller.dll  ✅ COMPILADO
+    └── Gelita-IT-Toolkit.dll  ✅ COMPILADO
 ```
 
 ---

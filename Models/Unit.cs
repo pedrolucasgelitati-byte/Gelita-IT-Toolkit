@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Models
+namespace GelitaITToolkit.Models
 {
     using System.Collections.Generic;
     using System.Text.Json.Serialization;
@@ -25,6 +25,18 @@ namespace GelitaInstaller.Models
         /// </summary>
         [JsonPropertyName("printers")]
         public List<string> Printers { get; set; }
+
+        /// <summary>Caminho opcional do script corporativo para instalar as impressoras da unidade.</summary>
+        [JsonPropertyName("installScript")]
+        public string? InstallScript { get; set; }
+
+        /// <summary>Caminho opcional do script corporativo para remover as impressoras da unidade.</summary>
+        [JsonPropertyName("removeScript")]
+        public string? RemoveScript { get; set; }
+
+        /// <summary>Faixa de IP reservada para impressoras da unidade.</summary>
+        [JsonPropertyName("printerIpRange")]
+        public string? PrinterIpRange { get; set; }
 
         /// <summary>
         /// Inicializa uma nova instância da classe <see cref="Unit"/>.

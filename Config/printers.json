@@ -3,27 +3,70 @@
     {
       "name": "Maringá",
       "printServer": "\\\\br-mga1-srv013v",
+      "printerIpRange": "10.55.44.0/24",
+      "installScript": "Y:\\Install\\PRINTERS\\BR-MGA1-SRV013V\\Install print_MGA.bat",
+      "removeScript": "Y:\\Install\\PRINTERS\\BR-MGA1-SRV013V\\Remove print_MGA.bat",
       "printers": [
         "MG_PRINTER_224",
         "MG_PRINTER_225",
-        "MG_PRINTER_226"
+        "MG_PRINTER_226",
+        "MG_PRINTER_227",
+        "MG_PRINTER_228",
+        "MG_PRINTER_230",
+        "MG_PRINTER_231",
+        "MG_PRINTER_232",
+        "MG_PRINTER_233",
+        "MG_PRINTER_235",
+        "MG_PRINTER_236",
+        "MG_PRINTER_237",
+        "MG_PRINTER_238",
+        "MG_PRINTER_240",
+        "MG_PRINTER_241",
+        "MG_PRINTER_242",
+        "MG_PRINTER_243"
       ]
     },
     {
       "name": "Cotia",
       "printServer": "\\\\br-coa1-srv013v",
+      "printerIpRange": "10.55.12.42 - 10.55.12.63",
+      "installScript": "Y:\\Install\\PRINTERS\\BR-COA1-SRV013V\\Install print_COA.bat",
+      "removeScript": "Y:\\Install\\PRINTERS\\BR-COA1-SRV013V\\Remove print_COA.bat",
       "printers": [
-        "CT_PRINTER_101",
-        "CT_PRINTER_102"
+        "CO_PRINTER_042",
+        "CO_PRINTER_043",
+        "CO_PRINTER_044",
+        "CO_PRINTER_045",
+        "CO_PRINTER_047",
+        "CO_PRINTER_048",
+        "CO_PRINTER_051",
+        "CO_PRINTER_052",
+        "CO_PRINTER_054",
+        "CO_PRINTER_055",
+        "CO_PRINTER_057",
+        "CO_PRINTER_059",
+        "CO_PRINTER_061",
+        "CO_PRINTER_062"
       ]
     },
     {
       "name": "Mococa",
       "printServer": "\\\\br-mco1-srv013v",
+      "printerIpRange": "Pendente de definição",
+      "installScript": "Y:\\Install\\PRINTERS\\BR-MCO1-SRV013V\\Install print_MCO.bat",
+      "removeScript": "Y:\\Install\\PRINTERS\\BR-MCO1-SRV013V\\Remove print_MCO.bat",
       "printers": [
-        "MC_PRINTER_001",
-        "MC_PRINTER_002",
-        "MC_PRINTER_003"
+        "MO_PRINTER_130",
+        "MO_PRINTER_133",
+        "MO_PRINTER_134",
+        "MO_PRINTER_135",
+        "MO_PRINTER_144",
+        "MO_PRINTER_145",
+        "MO_PRINTER_146",
+        "MO_PRINTER_149",
+        "MO_PRINTER_150",
+        "MO_PRINTER_155",
+        "MO_PRINTER_156"
       ]
     }
   ]

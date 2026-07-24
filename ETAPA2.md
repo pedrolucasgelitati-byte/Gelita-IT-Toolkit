@@ -1,4 +1,4 @@
-# 🎉 INTERFACE PRINCIPAL GELITA PRINTER & SCANNER INSTALLER
+# 🎉 INTERFACE PRINCIPAL Gelita IT Toolkit
 
 ## 📋 Resumo da Entrega
 
@@ -65,7 +65,7 @@ Abra [TESTES.md](TESTES.md) - 20 testes específicos
 ## 📸 Interface Visual
 
 ```
-┌─ Gelita Printer & Scanner Installer ─────────────────────┐
+┌─ Gelita IT Toolkit ─────────────────────┐
 │ File  Help                                                │
 ├──────────────────────────────────────────────────────────┤
 │                                                            │
@@ -253,7 +253,7 @@ Linhas de documentação: ~1200
 ```bash
 # 1. Abrir projeto
 Visual Studio 2022
-→ File > Open > GelitaInstaller.csproj
+→ File > Open > Gelita-IT-Toolkit.csproj
 
 # 2. Compilar
 Ctrl+Shift+B

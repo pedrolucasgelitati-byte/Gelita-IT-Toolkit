@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Services
+namespace GelitaITToolkit.Services
 {
     using System;
     using System.Collections.Generic;
@@ -6,7 +6,7 @@ namespace GelitaInstaller.Services
     using System.Linq;
     using System.Text.Json;
     using System.Windows.Forms;
-    using GelitaInstaller.Models;
+    using GelitaITToolkit.Models;
 
     /// <summary>
     /// Serviço responsável por carregar e gerenciar os arquivos de configuração JSON.
@@ -244,6 +244,31 @@ namespace GelitaInstaller.Services
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return new List<Scanner>();
+            }
+        }
+
+        /// <summary>
+        /// Salva a lista de scanners configurados no arquivo scanners.json.
+        /// </summary>
+        public bool SaveScanners(IEnumerable<Scanner> scanners)
+        {
+            try
+            {
+                string filePath = Path.Combine(_configPath, "scanners.json");
+                var scannerList = scanners.ToList();
+                var jsonContent = JsonSerializer.Serialize(new { scanners = scannerList }, _jsonOptions);
+                File.WriteAllText(filePath, jsonContent);
+                _scannersCache = scannerList;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Erro ao salvar scanners.json:\n\n" + ex.Message,
+                    "Erro ao Salvar Configuração",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
             }
         }
 

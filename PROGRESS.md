@@ -2,7 +2,7 @@
 
 ## ✅ Resumo da Etapa Atual
 
-A interface principal do **Gelita Printer & Scanner Installer** foi **completamente implementada** e está **pronta para testes**.
+A interface principal do **Gelita IT Toolkit** foi **completamente implementada** e está **pronta para testes**.
 
 ---
 

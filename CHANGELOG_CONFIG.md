@@ -90,7 +90,7 @@ public string Name { get; set; }
 
 1. **Novo Import:**
    ```csharp
-   using GelitaInstaller.Services;
+   using GelitaITToolkit.Services;
    ```
 
 2. **Campo Privado Atualizado:**

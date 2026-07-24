@@ -9,7 +9,7 @@ A interface principal da aplicação foi **100% criada** e pronta para uso. Segu
 ## 🎨 Layout da Interface
 
 ```
-┌─ Gelita Printer & Scanner Installer ─────────────────────────────────┐
+┌─ Gelita IT Toolkit ─────────────────────────────────┐
 │  File  Help                                                            │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                         │

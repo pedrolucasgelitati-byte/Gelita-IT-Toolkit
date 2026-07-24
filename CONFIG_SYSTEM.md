@@ -123,7 +123,7 @@ private void CreateDefaultUnitsJson(string filePath)
 #### `Forms/MainForm.cs` (Melhorado)
 
 **Mudanças:**
-1. Adicionado import: `using GelitaInstaller.Services;`
+1. Adicionado import: `using GelitaITToolkit.Services;`
 2. Removido import: `using System.Text.Json;` (agora no ConfigService)
 3. Campo privado mudou:
    ```csharp
@@ -493,7 +493,7 @@ private void CreateDefaultPrintersJson(string filePath)
 ### Compilação Bem-Sucedida ✅
 ```
 Restaurar êxito(s) com 2 aviso(s) em 3,2s
-GelitaInstaller net8.0-windows êxito(s) com 28 aviso(s) → bin\Debug\net8.0-windows\GelitaInstaller.dll
+GelitaITToolkit net8.0-windows êxito(s) com 28 aviso(s) → bin\Debug\net8.0-windows\Gelita-IT-Toolkit.dll
 Construir êxito(s) com 30 aviso(s) em 6,7s
 ```
 

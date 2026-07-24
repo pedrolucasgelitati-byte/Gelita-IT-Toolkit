@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Models
+namespace GelitaITToolkit.Models
 {
     /// <summary>
     /// Define as opções de instalação e configuração disponíveis no aplicativo.

@@ -1,12 +1,12 @@
-namespace GelitaInstaller
+namespace GelitaITToolkit
 {
     using System;
     using System.IO;
     using System.Windows.Forms;
-    using GelitaInstaller.Forms;
+    using GelitaITToolkit.Forms;
 
     /// <summary>
-    /// Classe de entrada da aplicação Gelita Printer & Scanner Installer.
+    /// Classe de entrada da aplicação Gelita IT Toolkit.
     /// </summary>
     static class Program
     {

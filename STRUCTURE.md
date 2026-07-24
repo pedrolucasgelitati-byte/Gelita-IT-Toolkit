@@ -3,7 +3,7 @@
 ## 📁 Estrutura Completa do Projeto
 
 ```
-GelitaInstaller/
+GelitaITToolkit/
 │
 ├── 📁 Assets/                          # Recursos e instaladores
 │   ├── 📁 EpsonScan2/                  # Instalador do Epson Scan 2
@@ -53,7 +53,7 @@ GelitaInstaller/
 ├── 📁 Resources/                       # Recursos adicionais
 │
 ├── 📄 Program.cs                       # Ponto de entrada
-├── 📄 GelitaInstaller.csproj           # Arquivo de projeto .NET
+├── 📄 Gelita-IT-Toolkit.csproj           # Arquivo de projeto .NET
 ├── 📄 README.md                        # Documentação principal
 ├── 📄 ARCHITECTURE.md                  # Documentação de arquitetura
 ├── 📄 DEVELOPMENT.md                   # Guia de desenvolvimento
@@ -88,11 +88,11 @@ GelitaInstaller/
 
 ### Namespaces
 ```
-GelitaInstaller              # Namespace raiz
-GelitaInstaller.Models       # Modelos de dados
-GelitaInstaller.Services     # Serviços de negócio
-GelitaInstaller.Helpers      # Classes auxiliares
-GelitaInstaller.Forms        # Formulários
+GelitaITToolkit              # Namespace raiz
+GelitaITToolkit.Models       # Modelos de dados
+GelitaITToolkit.Services     # Serviços de negócio
+GelitaITToolkit.Helpers      # Classes auxiliares
+GelitaITToolkit.Forms        # Formulários
 ```
 
 ### Classes
@@ -146,7 +146,7 @@ GelitaInstaller.Forms        # Formulários
 
 1. **Abrir o projeto no Visual Studio 2022**
    ```bash
-   open GelitaInstaller.csproj
+   open Gelita-IT-Toolkit.csproj
    ```
 
 2. **Restaurar pacotes NuGet**

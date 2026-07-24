@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Services
+namespace GelitaITToolkit.Services
 {
     using System;
     using System.Threading.Tasks;

@@ -72,7 +72,7 @@ A aplicação foi transformada de uma **interface básica simples** para uma **f
 
 ### ✅ Sobre
 - **Informações:**
-  - Título: Gelita Printer & Scanner Installer
+  - Título: Gelita IT Toolkit
   - Versão: 1.0.0
   - Desenvolvedor: GitHub Copilot
   - Empresa: Gelita AG

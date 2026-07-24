@@ -67,17 +67,17 @@
 
 ### ⚙️ Configuração do Projeto
 
-- [x] GelitaInstaller.csproj (com .NET 8.0)
+- [x] Gelita-IT-Toolkit.csproj (com .NET 8.0)
 - [x] Program.cs (ponto de entrada)
 - [x] .gitignore (controle de versão)
 
 ### 🏷️ Namespaces e Organização
 
-- [x] GelitaInstaller (raiz)
-- [x] GelitaInstaller.Models
-- [x] GelitaInstaller.Services
-- [x] GelitaInstaller.Helpers
-- [x] GelitaInstaller.Forms
+- [x] GelitaITToolkit (raiz)
+- [x] GelitaITToolkit.Models
+- [x] GelitaITToolkit.Services
+- [x] GelitaITToolkit.Helpers
+- [x] GelitaITToolkit.Forms
 
 ### 📝 Documentação XML
 
@@ -413,13 +413,13 @@
 
 ## Configuração .NET ✅
 
-### GelitaInstaller.csproj
+### Gelita-IT-Toolkit.csproj
 - [x] Sdk="Microsoft.NET.Sdk.WindowsDesktop"
 - [x] TargetFramework net8.0-windows
 - [x] UseWindowsForms = true
 - [x] Nullable = enable
-- [x] AssemblyName = GelitaInstaller
-- [x] RootNamespace = GelitaInstaller
+- [x] AssemblyName = GelitaITToolkit
+- [x] RootNamespace = GelitaITToolkit
 - [x] Version = 1.0.0
 - [x] Dependências NuGet configuradas
 - [x] Copy to Output Directory configurado
@@ -500,7 +500,7 @@ Pronto para Desenvolvimento ✅
 
 ## 🎉 Projeto Concluído!
 
-O projeto **Gelita Printer & Scanner Installer** foi totalmente estruturado com:
+O projeto **Gelita IT Toolkit** foi totalmente estruturado com:
 
 ✅ 15 diretórios organizados  
 ✅ 21 classes criadas (4 + 8 + 5 + 4)  

@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Forms
+namespace GelitaITToolkit.Forms
 {
     using System;
     using System.Drawing;

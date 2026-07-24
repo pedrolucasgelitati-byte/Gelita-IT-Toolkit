@@ -1,8 +1,8 @@
-# 📋 Sumário Executivo - Gelita Printer & Scanner Installer
+# 📋 Sumário Executivo - Gelita IT Toolkit
 
 ## 🎯 Visão Geral
 
-**Projeto:** Gelita Printer & Scanner Installer  
+**Projeto:** Gelita IT Toolkit  
 **Versão:** 1.0.0 (Estrutura Completa)  
 **Data de Criação:** 2024  
 **Status:** ✅ Fase 1 - Setup Completo  
@@ -250,7 +250,7 @@ Configurações de aplicação, logging e paths
 
 ## 🎓 Convenções Adotadas
 
-- **Namespaces** - `GelitaInstaller.{Layer}`
+- **Namespaces** - `GelitaITToolkit.{Layer}`
 - **Classes** - PascalCase: `PrinterService`
 - **Métodos** - PascalCase público, camelCase privado
 - **Propriedades** - PascalCase com auto-properties
@@ -303,7 +303,7 @@ Configurações de aplicação, logging e paths
 - Windows 10/11
 
 ### Passos Iniciais
-1. Abrir `GelitaInstaller.csproj` no VS 2022
+1. Abrir `Gelita-IT-Toolkit.csproj` no VS 2022
 2. Build Solution (Ctrl+Shift+B)
 3. Ler QUICKSTART.md
 4. Ler ARCHITECTURE.md
@@ -316,7 +316,7 @@ Implementar Fase 2 (Helpers) conforme DEVELOPMENT.md
 
 ## 📞 Contato
 
-**Projeto:** Gelita Printer & Scanner Installer  
+**Projeto:** Gelita IT Toolkit  
 **Departamento:** Service Desk  
 **Empresa:** Gelita AG  
 **Status:** Pronto para desenvolvimento

@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Models
+namespace GelitaITToolkit.Models
 {
     using System.Text.Json.Serialization;
 
@@ -75,6 +75,11 @@ namespace GelitaInstaller.Models
             ProductId = productId;
             DisplayName = displayName;
             Guid = guid;
+        }
+
+        public override string ToString()
+        {
+            return string.IsNullOrWhiteSpace(IpAddress) ? Model : $"{Model} — {IpAddress}";
         }
     }
 }

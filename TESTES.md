@@ -26,7 +26,7 @@ Siga o plano de testes abaixo
 ### ✅ TESTE 1: Abertura da Aplicação
 **Ação:** Executar aplicação
 **Esperado:** 
-- [ ] Janela abre com título "Gelita Printer & Scanner Installer"
+- [ ] Janela abre com título "Gelita IT Toolkit"
 - [ ] ComboBox de unidades contém dados
 - [ ] StatusBar mostra "Pronto"
 

@@ -1,4 +1,4 @@
-# Quick Start - Gelita Printer & Scanner Installer
+# Quick Start - Gelita IT Toolkit
 
 ## 🚀 Início Rápido
 
@@ -12,7 +12,7 @@
 
 1. Abra Visual Studio 2022
 2. Clique em **File > Open > Project/Solution**
-3. Navegue até o arquivo `GelitaInstaller.csproj`
+3. Navegue até o arquivo `Gelita-IT-Toolkit.csproj`
 4. Clique em **Open**
 
 ### Passo 2: Restaurar Dependências
@@ -161,7 +161,7 @@ Ctrl+Shift+Space = Show Parameter Info
 - [Registry Access](https://docs.microsoft.com/dotnet/api/microsoft.win32.registry)
 
 ### Projetos de Exemplo
-- Gelita Printer & Scanner Installer (este projeto)
+- Gelita IT Toolkit (este projeto)
 - Outros projetos internos da Gelita
 
 ## 🎓 Aprendizado

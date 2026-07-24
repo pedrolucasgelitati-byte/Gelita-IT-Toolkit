@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Helpers
+namespace GelitaITToolkit.Helpers
 {
     using System;
     using System.Collections.Generic;

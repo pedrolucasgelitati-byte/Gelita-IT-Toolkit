@@ -2,7 +2,7 @@
 
 ## 🎉 Resumo Executivo
 
-A **interface principal (MainForm.cs)** do projeto **Gelita Printer & Scanner Installer** foi **100% implementada** e **pronta para testes**.
+A **interface principal (MainForm.cs)** do projeto **Gelita IT Toolkit** foi **100% implementada** e **pronta para testes**.
 
 ---
 
@@ -346,7 +346,7 @@ private async void InstallButton_Click(object sender, EventArgs e)
 
 ### 1. Abra VS2022
 ```
-File > Open > GelitaInstaller.csproj
+File > Open > Gelita-IT-Toolkit.csproj
 ```
 
 ### 2. Compile

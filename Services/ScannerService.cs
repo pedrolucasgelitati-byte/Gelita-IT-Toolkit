@@ -1,6 +1,6 @@
-namespace GelitaInstaller.Services
+namespace GelitaITToolkit.Services
 {
-    using GelitaInstaller.Models;
+    using GelitaITToolkit.Models;
     using System.Collections.Generic;
     using System.Threading.Tasks;
 

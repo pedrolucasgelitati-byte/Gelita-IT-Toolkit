@@ -195,7 +195,7 @@ Status: [_______________________]
 
 ### ℹ️ Sobre
 ```
-Gelita Printer & Scanner Installer
+Gelita IT Toolkit
 Versão: 1.0.0
 Desenvolvedor: GitHub Copilot
 Empresa: Gelita AG

@@ -1,6 +1,6 @@
 # 🎉 PROJETO CONCLUÍDO COM SUCESSO! 
 
-## Gelita Printer & Scanner Installer
+## Gelita IT Toolkit
 
 ---
 
@@ -75,7 +75,7 @@ installerprinters/
 ├── 📁 Resources/                 → Recursos adicionais
 │
 ├── 📄 Program.cs                 → Ponto de entrada
-├── 📄 GelitaInstaller.csproj     → Projeto .NET 8
+├── 📄 Gelita-IT-Toolkit.csproj     → Projeto .NET 8
 └── 📚 DOCUMENTAÇÃO (8 arquivos)
     ├── README.md
     ├── ARCHITECTURE.md
@@ -206,7 +206,7 @@ Implementar:
 ```
 1. Abra Visual Studio 2022
 2. File > Open > Project/Solution
-3. Selecione: GelitaInstaller.csproj
+3. Selecione: Gelita-IT-Toolkit.csproj
 ```
 
 ### Passo 2: Compilar
@@ -374,7 +374,7 @@ Projeto Pronto para Desenvolvimento ✅
 
 ## 🎉 Parabéns!
 
-Seu projeto **Gelita Printer & Scanner Installer** está **100% estruturado** e **pronto para desenvolvimento**!
+Seu projeto **Gelita IT Toolkit** está **100% estruturado** e **pronto para desenvolvimento**!
 
 A arquitetura está bem organizada, totalmente documentada e segue as melhores práticas profissionais.
 

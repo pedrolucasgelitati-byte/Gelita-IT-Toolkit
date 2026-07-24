@@ -1,4 +1,4 @@
-namespace GelitaInstaller.Models
+namespace GelitaITToolkit.Models
 {
     using System.Text.Json.Serialization;
 

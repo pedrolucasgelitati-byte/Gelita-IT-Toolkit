@@ -50,7 +50,7 @@ A **interface principal (MainForm.cs)** foi 100% implementada com todos os compo
 ```
 Visual Studio 2022
 → File > Open > Project/Solution
-→ Selecione: GelitaInstaller.csproj
+→ Selecione: Gelita-IT-Toolkit.csproj
 ```
 
 ### Passo 2: Compilar

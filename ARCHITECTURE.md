@@ -1,4 +1,4 @@
-# Arquitetura do Projeto - Gelita Printer & Scanner Installer
+# Arquitetura do Projeto - Gelita IT Toolkit
 
 ## Visão Geral da Arquitetura
 
