@@ -60,5 +60,12 @@ namespace GelitaITToolkit.Models
             Unit = unit;
             Model = model;
         }
+
+        public override string ToString()
+        {
+            return string.IsNullOrWhiteSpace(Model)
+                ? Name
+                : $"{Name} — {Model}";
+        }
     }
 }

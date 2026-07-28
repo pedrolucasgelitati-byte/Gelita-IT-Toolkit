@@ -4,7 +4,6 @@ namespace GelitaITToolkit.Services
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Drawing.Printing;
-    using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
     using GelitaITToolkit.Models;
@@ -16,7 +15,12 @@ namespace GelitaITToolkit.Services
         {
             ArgumentNullException.ThrowIfNull(unit);
             var printers = unit.Printers
-                .Select(name => new Printer(name, unit.PrintServer, name, unit.Name, string.Empty))
+                .Select(name => new Printer(
+                    name,
+                    unit.PrintServer,
+                    name,
+                    unit.Name,
+                    unit.ScannerModels.TryGetValue(name, out var model) ? model : "Modelo não informado"))
                 .ToList();
             return Task.FromResult(printers);
         }
@@ -37,16 +41,10 @@ namespace GelitaITToolkit.Services
             return true;
         }
 
-        /// <summary>
-        /// Executa o script corporativo da unidade quando disponível. Caso a unidade Y: não
-        /// esteja mapeada, instala cada compartilhamento diretamente no print server.
-        /// </summary>
+        /// <summary>Instala diretamente os compartilhamentos definidos para a unidade.</summary>
         public async Task<bool> InstallAllForUnit(Unit unit)
         {
             ArgumentNullException.ThrowIfNull(unit);
-            if (!string.IsNullOrWhiteSpace(unit.InstallScript) && File.Exists(unit.InstallScript))
-                return await ExecuteBatchAsync(unit.InstallScript);
-
             return await InstallMultiplePrinters(await GetPrintersByUnit(unit));
         }
 
@@ -57,13 +55,10 @@ namespace GelitaITToolkit.Services
             return await ExecutePrintUiAsync("/dn", BuildPrinterPath(unit.PrintServer, printerName));
         }
 
-        /// <summary>Remove todas as impressoras da unidade com o script corporativo, quando disponível.</summary>
+        /// <summary>Remove diretamente todos os compartilhamentos definidos para a unidade.</summary>
         public async Task<bool> RemoveAllForUnit(Unit unit)
         {
             ArgumentNullException.ThrowIfNull(unit);
-            if (!string.IsNullOrWhiteSpace(unit.RemoveScript) && File.Exists(unit.RemoveScript))
-                return await ExecuteBatchAsync(unit.RemoveScript);
-
             foreach (var printerName in unit.Printers)
             {
                 if (!await RemovePrinter(printerName, unit))
@@ -76,23 +71,6 @@ namespace GelitaITToolkit.Services
         {
             return PrinterSettings.InstalledPrinters.Cast<string>()
                 .Any(name => string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static async Task<bool> ExecuteBatchAsync(string scriptPath)
-        {
-            using var process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"\"{scriptPath}\"\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-
-            if (process == null)
-                return false;
-
-            await process.WaitForExitAsync();
-            return process.ExitCode == 0;
         }
 
         private static async Task<bool> ExecutePrintUiAsync(string action, string printerPath)

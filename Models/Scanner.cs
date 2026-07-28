@@ -79,7 +79,8 @@ namespace GelitaITToolkit.Models
 
         public override string ToString()
         {
-            return string.IsNullOrWhiteSpace(IpAddress) ? Model : $"{Model} — {IpAddress}";
+            var displayName = string.IsNullOrWhiteSpace(Name) ? Model : Name;
+            return string.IsNullOrWhiteSpace(IpAddress) ? displayName : $"{displayName} — {IpAddress}";
         }
     }
 }
