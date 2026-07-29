@@ -37,6 +37,9 @@ namespace GelitaITToolkit.Models
         [JsonPropertyName("model")]
         public string Model { get; set; }
 
+        [JsonIgnore]
+        public bool IsInstalled { get; set; }
+
         /// <summary>
         /// Inicializa uma nova instância da classe <see cref="Printer"/>.
         /// </summary>
@@ -59,6 +62,14 @@ namespace GelitaITToolkit.Models
             Share = share;
             Unit = unit;
             Model = model;
+        }
+
+        public override string ToString()
+        {
+            var description = string.IsNullOrWhiteSpace(Model)
+                ? Name
+                : $"{Name} — {Model}";
+            return IsInstalled ? $"{description} — Instalado" : $"{description} — Ausente";
         }
     }
 }

@@ -1,0 +1,3 @@
+a linha de comando para instalação sem interferência é:
+msiexec /i GlobalProtect64.msi /passive (mostra apenas a linha de progresso)
+msiexec /i GlobalProtect64.msi /quiet (instala sem nenhuma interação ou tela para os usuários)

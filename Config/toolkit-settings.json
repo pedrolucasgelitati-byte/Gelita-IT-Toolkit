@@ -1,0 +1,53 @@
+{
+  "paths": {
+    "epsonScan2": "Assets/EpsonScan2",
+    "naps2": "Assets/NAPS",
+    "sentinelOne": "Assets/SentinelOne",
+    "sentinelMsi": "Assets/SentinelOne/SentinelInstaller_windows_64bit_v23_1_4_650.msi",
+    "paloAlto": "Assets/PaloAlto Client",
+    "officeOdt": "C:/ODT",
+    "officeConfiguration": "C:/ODT/Configuração.xml"
+  },
+  "programs": [
+    {
+      "id": "epsonScan2",
+      "displayName": "Driver do scanner Epson + Epson Scan 2",
+      "enabled": true,
+      "pathKey": "epsonScan2",
+      "installerPattern": "*.exe",
+      "arguments": "/S"
+    },
+    {
+      "id": "naps2",
+      "displayName": "NAPS2 (Scanner de PDF)",
+      "enabled": true,
+      "pathKey": "naps2",
+      "installerPattern": "*.exe",
+      "arguments": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"
+    },
+    {
+      "id": "sentinelOne",
+      "displayName": "SentinelOne (proteção do endpoint)",
+      "enabled": true,
+      "pathKey": "sentinelOne",
+      "installerPattern": "*.bat",
+      "arguments": ""
+    },
+    {
+      "id": "office",
+      "displayName": "Microsoft Office (Office Deployment Tool)",
+      "enabled": true,
+      "pathKey": "officeOdt",
+      "installerPattern": "setup.exe",
+      "arguments": "/configure \"Configuração.xml\""
+    },
+    {
+      "id": "paloAlto",
+      "displayName": "Palo Alto GlobalProtect VPN",
+      "enabled": true,
+      "pathKey": "paloAlto",
+      "installerPattern": "GlobalProtect64.msi",
+      "arguments": "/quiet /norestart"
+    }
+  ]
+}

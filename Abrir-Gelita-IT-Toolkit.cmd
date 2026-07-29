@@ -2,6 +2,13 @@
 setlocal
 cd /d "%~dp0"
 
+tasklist /FI "IMAGENAME eq Gelita-IT-Toolkit.exe" /NH | find /I "Gelita-IT-Toolkit.exe" >nul
+if not errorlevel 1 (
+    echo Fechando a instancia anterior do Gelita IT Toolkit...
+    taskkill /IM "Gelita-IT-Toolkit.exe" >nul 2>&1
+    timeout /t 1 /nobreak >nul
+)
+
 echo Compilando Gelita IT Toolkit...
 dotnet build "Gelita-IT-Toolkit.sln" -v:q
 if errorlevel 1 (

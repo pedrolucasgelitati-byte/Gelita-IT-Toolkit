@@ -4,8 +4,9 @@ namespace GelitaITToolkit.Services
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Drawing.Printing;
-    using System.IO;
     using System.Linq;
+    using System.Net.Sockets;
+    using System.Threading;
     using System.Threading.Tasks;
     using GelitaITToolkit.Models;
 
@@ -16,7 +17,12 @@ namespace GelitaITToolkit.Services
         {
             ArgumentNullException.ThrowIfNull(unit);
             var printers = unit.Printers
-                .Select(name => new Printer(name, unit.PrintServer, name, unit.Name, string.Empty))
+                .Select(name => new Printer(
+                    name,
+                    unit.PrintServer,
+                    name,
+                    unit.Name,
+                    unit.ScannerModels.TryGetValue(name, out var model) ? model : "Modelo não informado"))
                 .ToList();
             return Task.FromResult(printers);
         }
@@ -37,16 +43,10 @@ namespace GelitaITToolkit.Services
             return true;
         }
 
-        /// <summary>
-        /// Executa o script corporativo da unidade quando disponível. Caso a unidade Y: não
-        /// esteja mapeada, instala cada compartilhamento diretamente no print server.
-        /// </summary>
+        /// <summary>Instala diretamente os compartilhamentos definidos para a unidade.</summary>
         public async Task<bool> InstallAllForUnit(Unit unit)
         {
             ArgumentNullException.ThrowIfNull(unit);
-            if (!string.IsNullOrWhiteSpace(unit.InstallScript) && File.Exists(unit.InstallScript))
-                return await ExecuteBatchAsync(unit.InstallScript);
-
             return await InstallMultiplePrinters(await GetPrintersByUnit(unit));
         }
 
@@ -57,13 +57,10 @@ namespace GelitaITToolkit.Services
             return await ExecutePrintUiAsync("/dn", BuildPrinterPath(unit.PrintServer, printerName));
         }
 
-        /// <summary>Remove todas as impressoras da unidade com o script corporativo, quando disponível.</summary>
+        /// <summary>Remove diretamente todos os compartilhamentos definidos para a unidade.</summary>
         public async Task<bool> RemoveAllForUnit(Unit unit)
         {
             ArgumentNullException.ThrowIfNull(unit);
-            if (!string.IsNullOrWhiteSpace(unit.RemoveScript) && File.Exists(unit.RemoveScript))
-                return await ExecuteBatchAsync(unit.RemoveScript);
-
             foreach (var printerName in unit.Printers)
             {
                 if (!await RemovePrinter(printerName, unit))
@@ -75,24 +72,67 @@ namespace GelitaITToolkit.Services
         public bool IsPrinterInstalled(string printerName)
         {
             return PrinterSettings.InstalledPrinters.Cast<string>()
-                .Any(name => string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase));
+                .Any(name =>
+                    string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith($"\\{printerName}", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{printerName} on ", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{printerName} em ", StringComparison.OrdinalIgnoreCase));
         }
 
-        private static async Task<bool> ExecuteBatchAsync(string scriptPath)
+        public async Task<bool> SetDefaultPrinter(Printer printer)
         {
-            using var process = Process.Start(new ProcessStartInfo
+            ArgumentNullException.ThrowIfNull(printer);
+            var installedName = FindInstalledPrinterName(printer);
+            return installedName != null && await ExecutePrintUiAsync("/y", installedName);
+        }
+
+        public async Task<bool> PrintTestPage(Printer printer)
+        {
+            ArgumentNullException.ThrowIfNull(printer);
+            var installedName = FindInstalledPrinterName(printer);
+            return installedName != null && await ExecutePrintUiAsync("/k", installedName);
+        }
+
+        public async Task<bool> TestRawPrintPortAsync(string host, int timeoutMilliseconds = 3000)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(host);
+            using var client = new TcpClient();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+            try
             {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"\"{scriptPath}\"\"",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-
-            if (process == null)
+                await client.ConnectAsync(host, 9100, timeout.Token);
+                return client.Connected;
+            }
+            catch
+            {
                 return false;
+            }
+        }
 
-            await process.WaitForExitAsync();
-            return process.ExitCode == 0;
+        public IReadOnlyList<IReadOnlyList<string>> FindDuplicateInstalledPrinters()
+        {
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .GroupBy(NormalizeInstalledPrinterName, StringComparer.OrdinalIgnoreCase)
+                .Where(group => !string.IsNullOrWhiteSpace(group.Key) && group.Count() > 1)
+                .Select(group => (IReadOnlyList<string>)group.ToList())
+                .ToList();
+        }
+
+        public async Task<int> RemoveDuplicateInstalledPrinters()
+        {
+            var removed = 0;
+            foreach (var group in FindDuplicateInstalledPrinters())
+            {
+                var defaultPrinter = group.FirstOrDefault(name => new PrinterSettings { PrinterName = name }.IsDefaultPrinter);
+                var keep = defaultPrinter ?? group[0];
+                foreach (var printerName in group.Where(name => !string.Equals(name, keep, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (await ExecutePrintUiAsync("/dn", printerName))
+                        removed++;
+                }
+            }
+
+            return removed;
         }
 
         private static async Task<bool> ExecutePrintUiAsync(string action, string printerPath)
@@ -117,6 +157,34 @@ namespace GelitaITToolkit.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(server);
             ArgumentException.ThrowIfNullOrWhiteSpace(share);
             return $"\\\\{server.Trim().TrimStart('\\').TrimEnd('\\')}\\{share.Trim().Trim('\\')}";
+        }
+
+        private static string? FindInstalledPrinterName(Printer printer)
+        {
+            var queue = printer.Share.Trim();
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .FirstOrDefault(name =>
+                    string.Equals(name, printer.Name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, queue, StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith($"\\{queue}", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{queue} on ", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{queue} em ", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeInstalledPrinterName(string name)
+        {
+            var normalized = name.Trim();
+            if (normalized.StartsWith(@"\\", StringComparison.Ordinal))
+                normalized = normalized.Split('\\', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? normalized;
+
+            foreach (var separator in new[] { " on ", " em " })
+            {
+                var separatorIndex = normalized.IndexOf(separator, StringComparison.OrdinalIgnoreCase);
+                if (separatorIndex > 0)
+                    normalized = normalized[..separatorIndex];
+            }
+
+            return normalized.Trim();
         }
     }
 }

@@ -4,8 +4,24 @@
       "name": "Maringá",
       "printServer": "\\\\br-mga1-srv013v",
       "printerIpRange": "10.55.44.0/24",
-      "installScript": "Y:\\Install\\PRINTERS\\BR-MGA1-SRV013V\\Install print_MGA.bat",
-      "removeScript": "Y:\\Install\\PRINTERS\\BR-MGA1-SRV013V\\Remove print_MGA.bat",
+      "scannerModels": {
+        "MG_PRINTER_224": "Epson WF-M5899",
+        "MG_PRINTER_225": "Epson WF-M5899",
+        "MG_PRINTER_226": "Epson WF-M5899",
+        "MG_PRINTER_227": "Epson WF-C5899",
+        "MG_PRINTER_230": "Epson WF-M5899",
+        "MG_PRINTER_231": "Epson WF-M5899",
+        "MG_PRINTER_232": "Epson WF-M5899",
+        "MG_PRINTER_233": "Epson WF-M5899",
+          "MG_PRINTER_235": "Epson WF-C5899",
+          "MG_PRINTER_236": "Epson WF-M5899",
+          "MG_PRINTER_237": "Epson WF-M5899",
+          "MG_PRINTER_241": "Epson WF-C5899"
+        },
+        "scannerExcludedPrinters": [
+          "MG_PRINTER_228",
+          "MG_PRINTER_240"
+        ],
       "printers": [
         "MG_PRINTER_224",
         "MG_PRINTER_225",
@@ -30,8 +46,22 @@
       "name": "Cotia",
       "printServer": "\\\\br-coa1-srv013v",
       "printerIpRange": "10.55.12.42 - 10.55.12.63",
-      "installScript": "Y:\\Install\\PRINTERS\\BR-COA1-SRV013V\\Install print_COA.bat",
-      "removeScript": "Y:\\Install\\PRINTERS\\BR-COA1-SRV013V\\Remove print_COA.bat",
+      "scannerModels": {
+        "CO_PRINTER_042": "Epson WF-C5899",
+        "CO_PRINTER_043": "Epson WF-C5899",
+        "CO_PRINTER_044": "Epson WF-M5899",
+        "CO_PRINTER_045": "Epson WF-C5899",
+        "CO_PRINTER_047": "Epson WF-C5899",
+        "CO_PRINTER_048": "Epson WF-C5899",
+        "CO_PRINTER_051": "Epson WF-C5899",
+        "CO_PRINTER_052": "Epson WF-C5899",
+        "CO_PRINTER_054": "Epson WF-C5899",
+        "CO_PRINTER_055": "Epson WF-C5899",
+        "CO_PRINTER_057": "Epson WF-C5899",
+        "CO_PRINTER_059": "Epson WF-C5899",
+        "CO_PRINTER_061": "Epson WF-C5899",
+        "CO_PRINTER_062": "Epson WF-C5899"
+      },
       "printers": [
         "CO_PRINTER_042",
         "CO_PRINTER_043",
@@ -52,9 +82,22 @@
     {
       "name": "Mococa",
       "printServer": "\\\\br-mco1-srv013v",
-      "printerIpRange": "Pendente de definição",
-      "installScript": "Y:\\Install\\PRINTERS\\BR-MCO1-SRV013V\\Install print_MCO.bat",
-      "removeScript": "Y:\\Install\\PRINTERS\\BR-MCO1-SRV013V\\Remove print_MCO.bat",
+      "printerIpRange": "10.55.103.130 - 10.55.103.156",
+      "scannerModels": {
+        "MO_PRINTER_130": "Epson WF-M5899",
+        "MO_PRINTER_133": "Epson WF-C5899",
+        "MO_PRINTER_134": "Epson WF-C5899",
+        "MO_PRINTER_135": "Epson WF-M5899",
+        "MO_PRINTER_144": "Epson WF-M5899",
+        "MO_PRINTER_146": "Epson WF-M5899",
+        "MO_PRINTER_149": "Epson WF-M5899",
+        "MO_PRINTER_150": "Epson WF-C5899",
+        "MO_PRINTER_156": "Epson WF-C5899"
+      },
+      "scannerExcludedPrinters": [
+        "MO_PRINTER_145",
+        "MO_PRINTER_155"
+      ],
       "printers": [
         "MO_PRINTER_130",
         "MO_PRINTER_133",

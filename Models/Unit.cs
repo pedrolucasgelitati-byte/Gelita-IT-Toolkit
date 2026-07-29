@@ -26,17 +26,17 @@ namespace GelitaITToolkit.Models
         [JsonPropertyName("printers")]
         public List<string> Printers { get; set; }
 
-        /// <summary>Caminho opcional do script corporativo para instalar as impressoras da unidade.</summary>
-        [JsonPropertyName("installScript")]
-        public string? InstallScript { get; set; }
-
-        /// <summary>Caminho opcional do script corporativo para remover as impressoras da unidade.</summary>
-        [JsonPropertyName("removeScript")]
-        public string? RemoveScript { get; set; }
-
         /// <summary>Faixa de IP reservada para impressoras da unidade.</summary>
         [JsonPropertyName("printerIpRange")]
         public string? PrinterIpRange { get; set; }
+
+        /// <summary>Modelos de scanner conhecidos, indexados pelo nome da fila de impressão.</summary>
+        [JsonPropertyName("scannerModels")]
+        public Dictionary<string, string> ScannerModels { get; set; }
+
+        /// <summary>Filas que não possuem scanner e não devem aparecer na aba Scanners.</summary>
+        [JsonPropertyName("scannerExcludedPrinters")]
+        public List<string> ScannerExcludedPrinters { get; set; }
 
         /// <summary>
         /// Inicializa uma nova instância da classe <see cref="Unit"/>.
@@ -44,6 +44,8 @@ namespace GelitaITToolkit.Models
         public Unit()
         {
             Printers = new List<string>();
+            ScannerModels = new Dictionary<string, string>();
+            ScannerExcludedPrinters = new List<string>();
         }
 
         /// <summary>
@@ -57,6 +59,8 @@ namespace GelitaITToolkit.Models
             Name = name;
             PrintServer = printServer;
             Printers = printers ?? new List<string>();
+            ScannerModels = new Dictionary<string, string>();
+            ScannerExcludedPrinters = new List<string>();
         }
     }
 }

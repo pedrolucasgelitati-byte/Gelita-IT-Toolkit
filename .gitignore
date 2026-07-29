@@ -1,4 +1,4 @@
-# .gitignore para Gelita Printer & Scanner Installer
+# .gitignore para Gelita IT Tool Kit
 
 # Visual Studio
 .vs/
@@ -82,3 +82,12 @@ publish/
 .env
 .env.local
 local.settings.json
+
+# Pacote local do SentinelOne: instalador e token não devem ir para o GitHub
+Assets/SentinelOne/
+
+# Pacote local do GlobalProtect: o MSI excede o limite de tamanho do GitHub
+Assets/PaloAlto Client/*.msi
+
+# Artefato intermediário de criação do ícone; apenas a versão final é usada pelo aplicativo
+Assets/Icons/Gelita-IT-Toolkit-taskbar-source.png
