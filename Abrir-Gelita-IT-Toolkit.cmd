@@ -2,11 +2,36 @@
 setlocal
 cd /d "%~dp0"
 
-tasklist /FI "IMAGENAME eq Gelita-IT-Toolkit.exe" /NH | find /I "Gelita-IT-Toolkit.exe" >nul
-if not errorlevel 1 (
-    echo Fechando a instancia anterior do Gelita IT Toolkit...
-    taskkill /IM "Gelita-IT-Toolkit.exe" >nul 2>&1
-    timeout /t 1 /nobreak >nul
+rem Pacote portatil: o executavel fica ao lado deste iniciador.
+if exist "%~dp0Gelita-IT-Toolkit.exe" (
+    start "" "%~dp0Gelita-IT-Toolkit.exe"
+    exit /b 0
+)
+
+rem Repositorio de desenvolvimento: reutiliza um pacote publicado, se existir.
+set "portableExe="
+for %%F in ("%~dp0dist\Gelita-IT-Toolkit-v*-win-x64\Gelita-IT-Toolkit.exe") do (
+    if exist "%%~fF" (
+        set "portableExe=%%~fF"
+    )
+)
+if defined portableExe (
+    start "" "%portableExe%"
+    exit /b 0
+)
+
+rem Somente desenvolvedores precisam compilar o codigo-fonte.
+where dotnet >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo O executavel portatil nao foi encontrado.
+    echo.
+    echo Esta pasta parece ser o codigo-fonte do programa, nao o pacote para usuarios.
+    echo Baixe o arquivo ZIP na pagina Releases do GitHub, extraia todo o conteudo
+    echo e execute Gelita-IT-Toolkit.exe.
+    echo.
+    pause
+    exit /b 1
 )
 
 echo Compilando Gelita IT Toolkit...
@@ -19,5 +44,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-start "" "%~dp0bin\Debug\net8.0-windows\Gelita-IT-Toolkit.exe"
+if exist "%~dp0bin\Debug\net8.0-windows\Gelita-IT-Toolkit.exe" (
+    start "" "%~dp0bin\Debug\net8.0-windows\Gelita-IT-Toolkit.exe"
+) else (
+    echo O build terminou, mas o executavel nao foi encontrado.
+    pause
+    exit /b 1
+)
 endlocal
