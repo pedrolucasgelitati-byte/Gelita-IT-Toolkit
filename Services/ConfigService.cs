@@ -150,6 +150,171 @@ namespace GelitaITToolkit.Services
             return _unitsCache.Keys.ToList();
         }
 
+        public bool TryLoadToolkitConfiguration(
+            out ToolkitSettings settings,
+            out InstallerHashSettings hashes,
+            out List<string> errors)
+        {
+            settings = new ToolkitSettings();
+            hashes = new InstallerHashSettings();
+            errors = ValidateConfigurationFiles();
+            if (errors.Count > 0)
+                return false;
+
+            try
+            {
+                settings = JsonSerializer.Deserialize<ToolkitSettings>(
+                    File.ReadAllText(Path.Combine(_configPath, "toolkit-settings.json")),
+                    _jsonOptions) ?? new ToolkitSettings();
+                hashes = JsonSerializer.Deserialize<InstallerHashSettings>(
+                    File.ReadAllText(Path.Combine(_configPath, "installer-hashes.json")),
+                    _jsonOptions) ?? new InstallerHashSettings();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Falha ao carregar as configurações: {ex.Message}");
+                return false;
+            }
+        }
+
+        public string ResolveConfiguredPath(ToolkitSettings settings, string pathKey)
+        {
+            if (!settings.Paths.TryGetValue(pathKey, out var configuredPath) ||
+                string.IsNullOrWhiteSpace(configuredPath))
+                throw new InvalidOperationException($"O caminho '{pathKey}' não foi configurado.");
+
+            var expandedPath = Environment.ExpandEnvironmentVariables(configuredPath);
+            return Path.GetFullPath(
+                Path.IsPathRooted(expandedPath)
+                    ? expandedPath
+                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, expandedPath));
+        }
+
+        public List<string> ValidateConfigurationFiles()
+        {
+            var errors = new List<string>();
+            ValidatePrintersConfiguration(errors);
+            ValidateToolkitConfiguration(errors);
+            ValidateHashesConfiguration(errors);
+            return errors;
+        }
+
+        private void ValidatePrintersConfiguration(List<string> errors)
+        {
+            var path = Path.Combine(_configPath, "printers.json");
+            if (!File.Exists(path))
+            {
+                errors.Add("Config/printers.json não foi encontrado.");
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(path));
+                if (!document.RootElement.TryGetProperty("units", out var units) ||
+                    units.ValueKind != JsonValueKind.Array)
+                {
+                    errors.Add("printers.json deve possuir uma lista 'units'.");
+                    return;
+                }
+
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var unitElement in units.EnumerateArray())
+                {
+                    var unit = JsonSerializer.Deserialize<Unit>(unitElement.GetRawText(), _jsonOptions);
+                    if (unit == null || string.IsNullOrWhiteSpace(unit.Name))
+                        errors.Add("Todas as unidades precisam possuir um nome.");
+                    else if (!names.Add(unit.Name))
+                        errors.Add($"Unidade duplicada em printers.json: {unit.Name}.");
+
+                    if (unit == null || string.IsNullOrWhiteSpace(unit.PrintServer))
+                        errors.Add($"A unidade {unit?.Name ?? "sem nome"} não possui printServer.");
+                    if (unit?.Printers == null || unit.Printers.Count == 0)
+                        errors.Add($"A unidade {unit?.Name ?? "sem nome"} não possui impressoras.");
+                    else if (unit.Printers.Count != unit.Printers.Distinct(StringComparer.OrdinalIgnoreCase).Count())
+                        errors.Add($"A unidade {unit.Name} possui impressoras duplicadas.");
+                }
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"printers.json inválido: {ex.Message}");
+            }
+        }
+
+        private void ValidateToolkitConfiguration(List<string> errors)
+        {
+            var path = Path.Combine(_configPath, "toolkit-settings.json");
+            if (!File.Exists(path))
+            {
+                errors.Add("Config/toolkit-settings.json não foi encontrado.");
+                return;
+            }
+
+            try
+            {
+                var settings = JsonSerializer.Deserialize<ToolkitSettings>(File.ReadAllText(path), _jsonOptions);
+                if (settings == null || settings.Programs.Count == 0)
+                {
+                    errors.Add("toolkit-settings.json não possui programas.");
+                    return;
+                }
+
+                var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var program in settings.Programs)
+                {
+                    if (string.IsNullOrWhiteSpace(program.Id) || !ids.Add(program.Id))
+                        errors.Add($"ID de programa vazio ou duplicado: '{program.Id}'.");
+                    if (string.IsNullOrWhiteSpace(program.DisplayName))
+                        errors.Add($"O programa {program.Id} não possui displayName.");
+                    if (!settings.Paths.ContainsKey(program.PathKey))
+                        errors.Add($"O programa {program.Id} referencia o caminho inexistente '{program.PathKey}'.");
+                    if (string.IsNullOrWhiteSpace(program.InstallerPattern))
+                        errors.Add($"O programa {program.Id} não possui installerPattern.");
+                }
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"toolkit-settings.json inválido: {ex.Message}");
+            }
+        }
+
+        private void ValidateHashesConfiguration(List<string> errors)
+        {
+            var path = Path.Combine(_configPath, "installer-hashes.json");
+            if (!File.Exists(path))
+            {
+                errors.Add("Config/installer-hashes.json não foi encontrado.");
+                return;
+            }
+
+            try
+            {
+                var settings = JsonSerializer.Deserialize<InstallerHashSettings>(File.ReadAllText(path), _jsonOptions);
+                if (settings == null || settings.Hashes.Count == 0)
+                {
+                    errors.Add("installer-hashes.json não possui hashes.");
+                    return;
+                }
+
+                foreach (var (name, hash) in settings.Hashes)
+                    if (string.IsNullOrWhiteSpace(hash) || hash.Length != 64 || !hash.All(Uri.IsHexDigit))
+                        errors.Add($"Hash SHA-256 inválido para '{name}'.");
+
+                foreach (var requiredHash in new[]
+                         {
+                             "epsonC5890", "epsonM5899", "naps2", "paloAlto",
+                             "sentinelMsi", "sentinelScript"
+                         })
+                    if (!settings.Hashes.ContainsKey(requiredHash))
+                        errors.Add($"O hash obrigatório '{requiredHash}' não foi configurado.");
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"installer-hashes.json inválido: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Carrega as impressoras do arquivo printers.json para uma unidade específica.
         /// </summary>

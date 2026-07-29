@@ -9,7 +9,9 @@
     <!-- Informações da Aplicação -->
     <AssemblyName>Gelita-IT-Toolkit</AssemblyName>
     <RootNamespace>GelitaITToolkit</RootNamespace>
-    <Version>0.1.0-alpha</Version>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <Authors>Gelita AG - Service Desk</Authors>
     <Description>Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.</Description>
     <Product>Gelita IT Toolkit</Product>
@@ -43,9 +45,18 @@
   <ItemGroup>
     <None Update="Config\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
     <None Update="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </None>
+    <None Update="LEIA-ME.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
   </ItemGroup>
 

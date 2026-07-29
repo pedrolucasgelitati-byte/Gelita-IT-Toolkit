@@ -1,0 +1,14 @@
+GELITA IT TOOLKIT 1.0.0
+========================
+
+COMO EXECUTAR NA MAQUINA DO USUARIO
+
+1. Mantenha esta pasta completa. Nao mova apenas o arquivo EXE.
+2. Segure a tecla SHIFT.
+3. Clique com o botao direito em Gelita-IT-Toolkit.exe.
+4. Escolha "Executar como outro usuario".
+5. Informe a conta administrativa do Service Desk.
+
+Nao execute o programa diretamente de dentro do ZIP.
+
+As pastas Assets e Config precisam permanecer ao lado do executavel.

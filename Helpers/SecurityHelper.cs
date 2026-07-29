@@ -4,6 +4,7 @@ namespace GelitaITToolkit.Helpers
     using System.Diagnostics;
     using System.IO;
     using System.Security.Cryptography;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -37,10 +38,12 @@ namespace GelitaITToolkit.Helpers
             if (!File.Exists(powershellPath))
                 return false;
 
-            const string signatureCheck =
-                "$signature = Get-AuthenticodeSignature -LiteralPath $args[0]; " +
+            var escapedPath = filePath.Replace("'", "''", StringComparison.Ordinal);
+            var signatureCheck =
+                $"$signature = Get-AuthenticodeSignature -LiteralPath '{escapedPath}'; " +
                 "if ($signature.Status -eq 'Valid' -and " +
                 "$signature.SignerCertificate.Subject -match 'O=Microsoft Corporation') { exit 0 }; exit 1";
+            var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(signatureCheck));
 
             using var process = new Process
             {
@@ -56,9 +59,8 @@ namespace GelitaITToolkit.Helpers
                         "-NoLogo",
                         "-NoProfile",
                         "-NonInteractive",
-                        "-Command",
-                        signatureCheck,
-                        filePath
+                        "-EncodedCommand",
+                        encodedCommand
                     }
                 }
             };

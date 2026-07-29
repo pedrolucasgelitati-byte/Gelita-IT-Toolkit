@@ -23,6 +23,51 @@ namespace GelitaITToolkit.Services
         }
 
         /// <summary>
+        /// Lê os scanners configurados pelo Epson Scan 2 neste computador.
+        /// A lista não é armazenada junto do Toolkit para evitar que configurações
+        /// específicas de uma máquina sejam transportadas em pendrives.
+        /// </summary>
+        public List<Scanner> GetConfiguredEpsonScanners()
+        {
+            const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
+
+            try
+            {
+                if (!File.Exists(connectionFile))
+                    return new List<Scanner>();
+
+                var contents = File.ReadAllText(connectionFile, Encoding.Unicode);
+                var root = JsonNode.Parse(contents);
+
+                return FindAllEpsonDevices(root)
+                    .Select(device =>
+                    {
+                        var model = device["modelName"]?["string"]?.GetValue<string>()
+                            ?? device["displayName"]?["string"]?.GetValue<string>()
+                            ?? "Epson Scan 2";
+                        var ipAddress = device["ipAddress"]?["string"]?.GetValue<string>() ?? string.Empty;
+                        var label = device["label"]?["string"]?.GetValue<string>();
+                        var scannerId = device["scannerID"]?["string"]?.GetValue<string>() ?? string.Empty;
+                        var productId = device["productID"]?["string"]?.GetValue<string>() ?? string.Empty;
+                        var displayName = device["displayName"]?["string"]?.GetValue<string>() ?? model;
+                        var guid = device["GUID"]?["string"]?.GetValue<string>() ?? string.Empty;
+                        var name = string.IsNullOrWhiteSpace(label) ? displayName : label;
+
+                        return new Scanner(model, ipAddress, name, scannerId, productId, displayName, guid);
+                    })
+                    .Where(scanner => !string.IsNullOrWhiteSpace(scanner.IpAddress))
+                    .GroupBy(scanner => scanner.IpAddress, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .OrderBy(scanner => scanner.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch
+            {
+                return new List<Scanner>();
+            }
+        }
+
+        /// <summary>
         /// Atualiza o rótulo de uma conexão de rede já cadastrada pelo Epson Scan 2.
         /// O Epson grava este rótulo como "Rede 01"; o Toolkit o substitui pelo
         /// nome da fila da impressora que possui o scanner.
@@ -149,6 +194,59 @@ namespace GelitaITToolkit.Services
             }
         }
 
+        public bool TryRemoveDuplicateEpsonScanners(out string message)
+        {
+            const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
+            try
+            {
+                if (!File.Exists(connectionFile))
+                {
+                    message = "Nenhuma configuração do Epson Scan 2 foi encontrada.";
+                    return true;
+                }
+
+                var contents = File.ReadAllText(connectionFile, Encoding.Unicode);
+                var root = JsonNode.Parse(contents);
+                var devices = FindAllEpsonDeviceReferences(root).ToList();
+                var duplicates = devices
+                    .Where(device => !string.IsNullOrWhiteSpace(device["ipAddress"]?["string"]?.GetValue<string>()))
+                    .GroupBy(device => device["ipAddress"]?["string"]?.GetValue<string>() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .SelectMany(group => group.Skip(1))
+                    .ToList();
+
+                if (duplicates.Count == 0)
+                {
+                    message = "Nenhuma configuração duplicada foi encontrada no Epson Scan 2.";
+                    return true;
+                }
+
+                foreach (var duplicate in duplicates)
+                    if (duplicate.Parent is JsonArray parent)
+                        parent.Remove(duplicate);
+
+                if ((root as JsonObject)?["DeviceList"] is JsonArray deviceList)
+                    NormalizeEpsonDeviceList(deviceList);
+
+                File.Copy(connectionFile, connectionFile + ".toolkit.bak", overwrite: true);
+                File.WriteAllText(
+                    connectionFile,
+                    root?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? contents,
+                    new UnicodeEncoding(false, true));
+                message = $"{duplicates.Count} configuração(ões) duplicada(s) removida(s) do Epson Scan 2.";
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                message = "São necessárias permissões de administrador para limpar as duplicidades do Epson Scan 2.";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                message = $"Não foi possível limpar as duplicidades do Epson Scan 2: {ex.Message}";
+                return false;
+            }
+        }
+
         private static JsonObject? CreateEpsonDeviceDefinition(string model)
         {
             if (model.Contains("C5899", StringComparison.OrdinalIgnoreCase))
@@ -201,6 +299,28 @@ namespace GelitaITToolkit.Services
             {
                 foreach (var item in jsonArray)
                     foreach (var device in FindAllEpsonDevices(item))
+                        yield return device;
+            }
+        }
+
+        private static IEnumerable<JsonObject> FindAllEpsonDeviceReferences(JsonNode? node)
+        {
+            if (node is JsonObject jsonObject)
+            {
+                if (jsonObject["scannerID"] is JsonObject)
+                {
+                    yield return jsonObject;
+                    yield break;
+                }
+
+                foreach (var property in jsonObject)
+                    foreach (var device in FindAllEpsonDeviceReferences(property.Value))
+                        yield return device;
+            }
+            else if (node is JsonArray jsonArray)
+            {
+                foreach (var item in jsonArray)
+                    foreach (var device in FindAllEpsonDeviceReferences(item))
                         yield return device;
             }
         }

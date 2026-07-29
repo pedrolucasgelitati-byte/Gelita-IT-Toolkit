@@ -5,6 +5,8 @@ namespace GelitaITToolkit.Services
     using System.Diagnostics;
     using System.Drawing.Printing;
     using System.Linq;
+    using System.Net.Sockets;
+    using System.Threading;
     using System.Threading.Tasks;
     using GelitaITToolkit.Models;
 
@@ -70,7 +72,67 @@ namespace GelitaITToolkit.Services
         public bool IsPrinterInstalled(string printerName)
         {
             return PrinterSettings.InstalledPrinters.Cast<string>()
-                .Any(name => string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase));
+                .Any(name =>
+                    string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith($"\\{printerName}", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{printerName} on ", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{printerName} em ", StringComparison.OrdinalIgnoreCase));
+        }
+
+        public async Task<bool> SetDefaultPrinter(Printer printer)
+        {
+            ArgumentNullException.ThrowIfNull(printer);
+            var installedName = FindInstalledPrinterName(printer);
+            return installedName != null && await ExecutePrintUiAsync("/y", installedName);
+        }
+
+        public async Task<bool> PrintTestPage(Printer printer)
+        {
+            ArgumentNullException.ThrowIfNull(printer);
+            var installedName = FindInstalledPrinterName(printer);
+            return installedName != null && await ExecutePrintUiAsync("/k", installedName);
+        }
+
+        public async Task<bool> TestRawPrintPortAsync(string host, int timeoutMilliseconds = 3000)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(host);
+            using var client = new TcpClient();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+            try
+            {
+                await client.ConnectAsync(host, 9100, timeout.Token);
+                return client.Connected;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public IReadOnlyList<IReadOnlyList<string>> FindDuplicateInstalledPrinters()
+        {
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .GroupBy(NormalizeInstalledPrinterName, StringComparer.OrdinalIgnoreCase)
+                .Where(group => !string.IsNullOrWhiteSpace(group.Key) && group.Count() > 1)
+                .Select(group => (IReadOnlyList<string>)group.ToList())
+                .ToList();
+        }
+
+        public async Task<int> RemoveDuplicateInstalledPrinters()
+        {
+            var removed = 0;
+            foreach (var group in FindDuplicateInstalledPrinters())
+            {
+                var defaultPrinter = group.FirstOrDefault(name => new PrinterSettings { PrinterName = name }.IsDefaultPrinter);
+                var keep = defaultPrinter ?? group[0];
+                foreach (var printerName in group.Where(name => !string.Equals(name, keep, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (await ExecutePrintUiAsync("/dn", printerName))
+                        removed++;
+                }
+            }
+
+            return removed;
         }
 
         private static async Task<bool> ExecutePrintUiAsync(string action, string printerPath)
@@ -95,6 +157,34 @@ namespace GelitaITToolkit.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(server);
             ArgumentException.ThrowIfNullOrWhiteSpace(share);
             return $"\\\\{server.Trim().TrimStart('\\').TrimEnd('\\')}\\{share.Trim().Trim('\\')}";
+        }
+
+        private static string? FindInstalledPrinterName(Printer printer)
+        {
+            var queue = printer.Share.Trim();
+            return PrinterSettings.InstalledPrinters.Cast<string>()
+                .FirstOrDefault(name =>
+                    string.Equals(name, printer.Name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, queue, StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith($"\\{queue}", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{queue} on ", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith($"{queue} em ", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeInstalledPrinterName(string name)
+        {
+            var normalized = name.Trim();
+            if (normalized.StartsWith(@"\\", StringComparison.Ordinal))
+                normalized = normalized.Split('\\', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? normalized;
+
+            foreach (var separator in new[] { " on ", " em " })
+            {
+                var separatorIndex = normalized.IndexOf(separator, StringComparison.OrdinalIgnoreCase);
+                if (separatorIndex > 0)
+                    normalized = normalized[..separatorIndex];
+            }
+
+            return normalized.Trim();
         }
     }
 }

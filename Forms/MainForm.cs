@@ -113,17 +113,19 @@ namespace GelitaITToolkit.Forms
         private Panel _sideNavigation = null!;
         private Label _sideNavigationTitle = null!;
         private readonly List<Button> _sideNavigationButtons = new();
-        private readonly Timer _sideNavigationTimer = new() { Interval = 450 };
-        private bool _sideNavigationExpanded;
+        private ProgressBar _installationsProgressBar = null!;
+        private Label _installationsProgressLabel = null!;
+        private RichTextBox _historyRichTextBox = null!;
+        private readonly HashSet<string> _installationErrors = new(StringComparer.OrdinalIgnoreCase);
+        private ToolkitSettings _toolkitSettings = new();
+        private InstallerHashSettings _installerHashes = new();
+        private readonly string _historyFilePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "GelitaITToolkit",
+            "execution-history.log");
 
         private static readonly Color GelitaNavy = Color.FromArgb(0, 59, 112);
         private static readonly Color GelitaYellow = Color.FromArgb(245, 169, 0);
-        private const string EpsonC5890Sha256 = "24CD718A7A64C9F4AB84FF8564FC5E3E00B7C465DFEC6A04ED20DDBF05F3DE2A";
-        private const string EpsonM5899Sha256 = "EED5C191DA1AE422E63C9D2BA5979EED4A27EE3E23A14BB6D1C5C7DC5D0F544E";
-        private const string NapsSha256 = "FD77DE4A6D123FE781C56DC06A710CF834F55C37D782BB6C2D4C7CB64B717E7A";
-        private const string PaloAltoSha256 = "AB4CD5E6421759B47596F861550F48CA2DF4ADD12B0FFF34984ACFC72CB21EA0";
-        private const string SentinelMsiSha256 = "57834BA1213784B897480E9AA1A6F121CBE6D04FA034495F2D860A835AE98919";
-        private const string SentinelScriptSha256 = "26B6B35F880A025F7213E709DA16DD11B56B925229E7303E6EB08A59577DC5E6";
         private static readonly Color GelitaLight = Color.FromArgb(247, 248, 250);
         private static readonly Color GelitaBorder = Color.FromArgb(220, 226, 233);
 
@@ -238,13 +240,12 @@ namespace GelitaITToolkit.Forms
 
             _sideNavigationTitle = new Label
             {
-                Text = "☰",
+                Text = "Gelita IT Tool Kit",
                 Location = new Point(6, 12),
-                Size = new Size(36, 32),
-                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(204, 32),
+                TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                ForeColor = GelitaYellow,
-                Cursor = Cursors.Hand
+                ForeColor = GelitaYellow
             };
             _sideNavigation.Controls.Add(_sideNavigationTitle);
 
@@ -275,7 +276,7 @@ namespace GelitaITToolkit.Forms
                     ForeColor = Color.White,
                     TextAlign = ContentAlignment.MiddleLeft,
                     Padding = new Padding(12, 0, 0, 0),
-                    Visible = false,
+                    Visible = true,
                     Cursor = Cursors.Hand
                 };
                 button.FlatAppearance.BorderSize = 0;
@@ -285,11 +286,6 @@ namespace GelitaITToolkit.Forms
                 _sideNavigation.Controls.Add(button);
                 top += 42;
             }
-
-            _sideNavigation.MouseEnter += SideNavigation_MouseEnter;
-            _sideNavigation.MouseLeave += SideNavigation_MouseLeave;
-            _sideNavigationTitle.MouseEnter += SideNavigation_MouseEnter;
-            _sideNavigationTimer.Tick += (_, _) => CollapseSideNavigation();
 
             _navigationContainer.Panel1.Controls.Add(_sideNavigation);
         }
@@ -302,47 +298,6 @@ namespace GelitaITToolkit.Forms
                 if (tab != null)
                     _tabControl.SelectedTab = tab;
             }
-        }
-
-        private void SideNavigation_MouseEnter(object? sender, EventArgs e)
-        {
-            _sideNavigationTimer.Stop();
-            ExpandSideNavigation();
-        }
-
-        private void SideNavigation_MouseLeave(object? sender, EventArgs e)
-        {
-            _sideNavigationTimer.Stop();
-            _sideNavigationTimer.Start();
-        }
-
-        private void ExpandSideNavigation()
-        {
-            if (_sideNavigationExpanded)
-                return;
-
-            _sideNavigationExpanded = true;
-            _navigationContainer.SplitterDistance = 216;
-            _sideNavigationTitle.Text = "Gelita IT Tool Kit";
-            _sideNavigationTitle.Size = new Size(204, 32);
-            _sideNavigationTitle.TextAlign = ContentAlignment.MiddleLeft;
-            foreach (var button in _sideNavigationButtons)
-                button.Visible = true;
-        }
-
-        private void CollapseSideNavigation()
-        {
-            _sideNavigationTimer.Stop();
-            if (!_sideNavigationExpanded || _sideNavigation.ClientRectangle.Contains(_sideNavigation.PointToClient(Cursor.Position)))
-                return;
-
-            _sideNavigationExpanded = false;
-            foreach (var button in _sideNavigationButtons)
-                button.Visible = false;
-            _navigationContainer.SplitterDistance = 48;
-            _sideNavigationTitle.Text = "☰";
-            _sideNavigationTitle.Size = new Size(36, 32);
-            _sideNavigationTitle.TextAlign = ContentAlignment.MiddleCenter;
         }
 
         private void CreateMenuLayout()
@@ -416,7 +371,14 @@ namespace GelitaITToolkit.Forms
             _tabControl.TabPages.Add(CreateAboutTab());
 
             ConfigureResponsiveLayout();
-            this.Shown += (_, _) => UseAvailableTabSpace();
+            this.Shown += (_, _) =>
+            {
+                // O SplitContainer ainda tem o tamanho padrão durante a construção;
+                // reaplica a largura quando a janela já possui suas dimensões reais.
+                _navigationContainer.SplitterDistance = 220;
+                UseAvailableTabSpace();
+                RefreshInstallationStatuses();
+            };
             ApplyVisualStyle(_tabControl);
 
             _navigationContainer = new SplitContainer
@@ -425,8 +387,8 @@ namespace GelitaITToolkit.Forms
                 FixedPanel = FixedPanel.Panel1,
                 IsSplitterFixed = true,
                 SplitterWidth = 1,
-                SplitterDistance = 48,
-                Panel1MinSize = 48,
+                SplitterDistance = 220,
+                Panel1MinSize = 220,
                 BackColor = GelitaBorder
             };
             _navigationContainer.Panel2.Controls.Add(_tabControl);
@@ -600,7 +562,7 @@ namespace GelitaITToolkit.Forms
                 "OSDisplayVersionTextBox",
                 20,
                 270,
-                300);
+                430);
 
             AddDashboardReadOnlyField(
                 infoPanel,
@@ -744,10 +706,10 @@ namespace GelitaITToolkit.Forms
             {
                 Name = "PrintersActionsPanel",
                 Dock = DockStyle.Bottom,
-                Height = 52,
+                Height = 96,
                 AutoSize = false,
                 FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
+                WrapContents = true,
                 Padding = new Padding(10, 8, 10, 8),
                 BackColor = Color.White
             };
@@ -828,6 +790,58 @@ namespace GelitaITToolkit.Forms
             };
             pingButton.Click += PrintersPingButton_Click;
             buttonsPanel.Controls.Add(pingButton);
+
+            var defaultButton = new Button
+            {
+                Text = "Definir Padrão",
+                Size = new Size(120, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = GelitaYellow,
+                ForeColor = GelitaNavy,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            defaultButton.Click += PrintersSetDefaultButton_Click;
+            buttonsPanel.Controls.Add(defaultButton);
+
+            var testPageButton = new Button
+            {
+                Text = "Página de Teste",
+                Size = new Size(130, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = GelitaNavy,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            testPageButton.Click += PrintersTestPageButton_Click;
+            buttonsPanel.Controls.Add(testPageButton);
+
+            var port9100Button = new Button
+            {
+                Text = "Testar Porta 9100",
+                Size = new Size(140, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(232, 236, 241),
+                ForeColor = GelitaNavy,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            port9100Button.Click += PrintersPort9100Button_Click;
+            buttonsPanel.Controls.Add(port9100Button);
+
+            var duplicateButton = new Button
+            {
+                Text = "Limpar Duplicadas",
+                Size = new Size(140, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(232, 236, 241),
+                ForeColor = GelitaNavy,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            duplicateButton.Click += PrintersRemoveDuplicatesButton_Click;
+            buttonsPanel.Controls.Add(duplicateButton);
 
             tabPage.Controls.Add(buttonsPanel);
             buttonsPanel.BringToFront();
@@ -966,7 +980,7 @@ namespace GelitaITToolkit.Forms
                 Location = new Point(20, 30),
                 Size = new Size(910, 250),
                 Font = new Font("Segoe UI", 9),
-                SelectionMode = SelectionMode.One
+                SelectionMode = SelectionMode.MultiExtended
             };
             listPanel.Controls.Add(scannersList);
 
@@ -986,8 +1000,8 @@ namespace GelitaITToolkit.Forms
 
             var removeButton = new Button
             {
-                Text = "Remover Selecionado",
-                Size = new Size(150, 35),
+                Text = "Remover Selecionados",
+                Size = new Size(165, 35),
                 Font = new Font("Segoe UI", 9),
                 BackColor = Color.FromArgb(232, 236, 241),
                 ForeColor = GelitaNavy,
@@ -1008,6 +1022,32 @@ namespace GelitaITToolkit.Forms
             };
             pingButton.Click += ScannersPingButton_Click;
             buttonsPanel.Controls.Add(pingButton);
+
+            var validateEpsonButton = new Button
+            {
+                Text = "Validar Todos no Epson Scan 2",
+                Size = new Size(230, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = GelitaNavy,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            validateEpsonButton.Click += ScannersValidateEpsonButton_Click;
+            buttonsPanel.Controls.Add(validateEpsonButton);
+
+            var removeDuplicatesButton = new Button
+            {
+                Text = "Limpar Duplicados",
+                Size = new Size(160, 35),
+                Font = new Font("Segoe UI", 9),
+                BackColor = Color.FromArgb(232, 236, 241),
+                ForeColor = GelitaNavy,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(5, 0, 0, 0)
+            };
+            removeDuplicatesButton.Click += ScannersRemoveDuplicatesButton_Click;
+            buttonsPanel.Controls.Add(removeDuplicatesButton);
 
             tabPage.Controls.Add(buttonsPanel);
             buttonsPanel.BringToFront();
@@ -1033,15 +1073,26 @@ namespace GelitaITToolkit.Forms
             {
                 Text = "Selecione os Softwares a Instalar",
                 Location = new Point(10, 10),
-                Size = new Size(950, 290),
+                Size = new Size(950, 350),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
+
+            var searchTextBox = new TextBox
+            {
+                Name = "InstallationsSearchTextBox",
+                PlaceholderText = "Pesquisar software...",
+                Location = new Point(30, 35),
+                Size = new Size(500, 28),
+                Font = new Font("Segoe UI", 9)
+            };
+            searchTextBox.TextChanged += InstallationsSearchTextBox_TextChanged;
+            optionsPanel.Controls.Add(searchTextBox);
 
             var epsonCheckbox = new CheckBox
             {
                 Name = "InstallEpsonScanCheckbox",
                 Text = "Driver do scanner Epson + Epson Scan 2",
-                Location = new Point(30, 40),
+                Location = new Point(30, 75),
                 Size = new Size(400, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
@@ -1052,7 +1103,7 @@ namespace GelitaITToolkit.Forms
             {
                 Name = "InstallNapsCheckbox",
                 Text = "NAPS2 (Not Another PDF Scanner - Scanner de PDF)",
-                Location = new Point(30, 80),
+                Location = new Point(30, 115),
                 Size = new Size(500, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
@@ -1063,7 +1114,7 @@ namespace GelitaITToolkit.Forms
             {
                 Name = "InstallSentinelOneCheckbox",
                 Text = "SentinelOne (proteção do endpoint)",
-                Location = new Point(30, 120),
+                Location = new Point(30, 155),
                 Size = new Size(500, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
@@ -1074,7 +1125,7 @@ namespace GelitaITToolkit.Forms
             {
                 Name = "InstallOfficeCheckbox",
                 Text = "Microsoft Office (Office Deployment Tool - C:\\ODT)",
-                Location = new Point(30, 160),
+                Location = new Point(30, 195),
                 Size = new Size(500, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
@@ -1085,7 +1136,7 @@ namespace GelitaITToolkit.Forms
             {
                 Name = "InstallPaloAltoCheckbox",
                 Text = "Palo Alto GlobalProtect VPN",
-                Location = new Point(30, 200),
+                Location = new Point(30, 235),
                 Size = new Size(500, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
@@ -1095,7 +1146,7 @@ namespace GelitaITToolkit.Forms
             var infoLabel = new Label
             {
                 Text = "ⓘ O pacote Epson instala o driver do scanner e o Epson Scan 2 juntos. Selecione o modelo correto antes de instalar.",
-                Location = new Point(30, 240),
+                Location = new Point(30, 280),
                 Size = new Size(880, 40),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.Gray,
@@ -1103,12 +1154,18 @@ namespace GelitaITToolkit.Forms
             };
             optionsPanel.Controls.Add(infoLabel);
 
+            AddInstallationStatusLabel(optionsPanel, epsonCheckbox, "InstallEpsonScanStatusLabel");
+            AddInstallationStatusLabel(optionsPanel, napsCheckbox, "InstallNapsStatusLabel");
+            AddInstallationStatusLabel(optionsPanel, sentinelOneCheckbox, "InstallSentinelOneStatusLabel");
+            AddInstallationStatusLabel(optionsPanel, officeCheckbox, "InstallOfficeStatusLabel");
+            AddInstallationStatusLabel(optionsPanel, paloAltoCheckbox, "InstallPaloAltoStatusLabel");
+
             tabPage.Controls.Add(optionsPanel);
 
             // Painel de Botões
             var buttonsPanel = new FlowLayoutPanel
             {
-                Location = new Point(10, 310),
+                Location = new Point(10, 370),
                 Size = new Size(950, 50),
                 AutoSize = true,
                 FlowDirection = FlowDirection.LeftToRight
@@ -1127,8 +1184,57 @@ namespace GelitaITToolkit.Forms
             installButton.Click += InstallationsInstallButton_Click;
             buttonsPanel.Controls.Add(installButton);
 
+            var executeAllButton = new Button
+            {
+                Name = "InstallationsExecuteAllButton",
+                Text = "Executar Tudo",
+                Size = new Size(150, 35),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                BackColor = GelitaYellow,
+                ForeColor = GelitaNavy,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(8, 0, 0, 0)
+            };
+            executeAllButton.Click += InstallationsExecuteAllButton_Click;
+            buttonsPanel.Controls.Add(executeAllButton);
+
             tabPage.Controls.Add(buttonsPanel);
+
+            _installationsProgressBar = new ProgressBar
+            {
+                Name = "InstallationsProgressBar",
+                Location = new Point(10, 425),
+                Size = new Size(700, 24),
+                Minimum = 0,
+                Maximum = 100
+            };
+            tabPage.Controls.Add(_installationsProgressBar);
+
+            _installationsProgressLabel = new Label
+            {
+                Name = "InstallationsProgressLabel",
+                Text = "Pronto",
+                Location = new Point(720, 425),
+                Size = new Size(240, 24),
+                Font = new Font("Segoe UI", 9),
+                ForeColor = GelitaNavy
+            };
+            tabPage.Controls.Add(_installationsProgressLabel);
+
             return tabPage;
+        }
+
+        private static void AddInstallationStatusLabel(Control parent, CheckBox checkBox, string name)
+        {
+            parent.Controls.Add(new Label
+            {
+                Name = name,
+                Text = "● Verificando...",
+                Location = new Point(650, checkBox.Top),
+                Size = new Size(250, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = Color.DarkOrange
+            });
         }
 
         /// <summary>
@@ -1281,6 +1387,8 @@ namespace GelitaITToolkit.Forms
             };
 
             // Botão Gerenciador de Impressoras
+            flowPanel.Controls.Add(CreateToolsCategoryLabel("Administração do Windows"));
+
             var printerMgmtButton = new Button
             {
                 Text = "Abrir Gerenciador de Impressoras",
@@ -1309,6 +1417,8 @@ namespace GelitaITToolkit.Forms
             flowPanel.Controls.Add(deviceMgmtButton);
 
             // Botão Limpeza de Spool
+            flowPanel.Controls.Add(CreateToolsCategoryLabel("Impressão e conectividade"));
+
             var spoolCleanButton = new Button
             {
                 Text = "Limpar Spool de Impressão",
@@ -1350,9 +1460,76 @@ namespace GelitaITToolkit.Forms
             portTesterButton.Click += ToolsPortTesterButton_Click;
             flowPanel.Controls.Add(portTesterButton);
 
+            flowPanel.Controls.Add(CreateToolsCategoryLabel("Central de Reparos"));
+
+            var diskCleanupButton = new Button
+            {
+                Text = "Abrir Limpeza de Disco",
+                Size = new Size(300, 40),
+                Font = new Font("Segoe UI", 9),
+                BackColor = GelitaNavy,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 5, 0, 5)
+            };
+            diskCleanupButton.Click += ToolsDiskCleanupButton_Click;
+            flowPanel.Controls.Add(diskCleanupButton);
+
+            flowPanel.Controls.Add(CreateSystemCommandButton("Limpar Arquivos Temporários", ToolsCleanTemporaryFilesButton_Click));
+            flowPanel.Controls.Add(CreateSystemCommandButton("Renovar IP e Limpar DNS", ToolsRenewIpAndDnsButton_Click));
+            flowPanel.Controls.Add(CreateSystemCommandButton("Redefinir Winsock", ToolsResetWinsockButton_Click));
+            flowPanel.Controls.Add(CreateSystemCommandButton("Reiniciar Serviços de Rede", ToolsRestartNetworkServicesButton_Click));
+            flowPanel.Controls.Add(CreateSystemCommandButton("Reparar Windows Update", ToolsRepairWindowsUpdateButton_Click));
+
+            var sfcButton = CreateSystemCommandButton("Verificar Windows — SFC /scannow", ToolsSfcButton_Click);
+            flowPanel.Controls.Add(sfcButton);
+
+            var dismScanButton = CreateSystemCommandButton("Verificar imagem — DISM ScanHealth", ToolsDismScanButton_Click);
+            flowPanel.Controls.Add(dismScanButton);
+
+            var dismRestoreButton = CreateSystemCommandButton("Reparar imagem — DISM RestoreHealth", ToolsDismRestoreButton_Click);
+            flowPanel.Controls.Add(dismRestoreButton);
+
+            var chkdskScanButton = CreateSystemCommandButton("Verificar disco — CHKDSK online", ToolsChkdskScanButton_Click);
+            flowPanel.Controls.Add(chkdskScanButton);
+
+            var chkdskRepairButton = CreateSystemCommandButton("Reparar disco — CHKDSK ao reiniciar", ToolsChkdskRepairButton_Click);
+            flowPanel.Controls.Add(chkdskRepairButton);
+
+            flowPanel.Controls.Add(CreateSystemCommandButton("Atualizar Tudo — winget", ToolsWingetUpdateAllButton_Click));
+
             toolsPanel.Controls.Add(flowPanel);
             tabPage.Controls.Add(toolsPanel);
             return tabPage;
+        }
+
+        private static Button CreateSystemCommandButton(string text, EventHandler clickHandler)
+        {
+            var button = new Button
+            {
+                Text = text,
+                Size = new Size(300, 40),
+                Font = new Font("Segoe UI", 9),
+                BackColor = GelitaNavy,
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 5, 0, 5)
+            };
+            button.Click += clickHandler;
+            return button;
+        }
+
+        private static Label CreateToolsCategoryLabel(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                Size = new Size(300, 30),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = GelitaNavy,
+                TextAlign = ContentAlignment.BottomLeft,
+                Margin = new Padding(0, 10, 0, 2)
+            };
         }
 
         /// <summary>
@@ -1398,8 +1575,8 @@ namespace GelitaITToolkit.Forms
             configListBox.Items.AddRange(new[] 
             { 
                 "Config/printers.json - Configuração de impressoras e unidades",
-                "Config/scanners.json - Configuração de scanners",
-                "Config/units.json - Informações de unidades"
+                "Config/toolkit-settings.json - Programas, caminhos e argumentos",
+                "Config/installer-hashes.json - Hashes SHA-256 dos instaladores"
             });
             settingsPanel.Controls.Add(configListBox);
 
@@ -1486,19 +1663,55 @@ namespace GelitaITToolkit.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            // RichTextBox Logs
+            var logsTabControl = new TabControl
+            {
+                Location = new Point(15, 25),
+                Size = new Size(920, 460),
+                Font = new Font("Segoe UI", 9)
+            };
+
+            var currentSessionTab = new TabPage { Text = "Sessão atual", Padding = new Padding(5) };
             _logsRichTextBox = new RichTextBox
             {
                 Name = "LogsRichTextBox",
-                Location = new Point(20, 30),
-                Size = new Size(910, 440),
+                Dock = DockStyle.Fill,
                 Font = new Font("Consolas", 8),
                 ReadOnly = true,
                 BackColor = Color.Black,
                 ForeColor = Color.Lime,
                 BorderStyle = BorderStyle.Fixed3D
             };
-            logsPanel.Controls.Add(_logsRichTextBox);
+            currentSessionTab.Controls.Add(_logsRichTextBox);
+            logsTabControl.TabPages.Add(currentSessionTab);
+
+            var historyTab = new TabPage { Text = "Histórico de execuções", Padding = new Padding(5) };
+            var historySearchTextBox = new TextBox
+            {
+                Name = "HistorySearchTextBox",
+                PlaceholderText = "Pesquisar no histórico...",
+                Dock = DockStyle.Top,
+                Font = new Font("Segoe UI", 9),
+                Height = 28
+            };
+            historySearchTextBox.TextChanged += HistorySearchTextBox_TextChanged;
+            historyTab.Controls.Add(historySearchTextBox);
+
+            _historyRichTextBox = new RichTextBox
+            {
+                Name = "HistoryRichTextBox",
+                Dock = DockStyle.Fill,
+                Font = new Font("Consolas", 8),
+                ReadOnly = true,
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                BorderStyle = BorderStyle.Fixed3D
+            };
+            historyTab.Controls.Add(_historyRichTextBox);
+            _historyRichTextBox.BringToFront();
+            historySearchTextBox.BringToFront();
+            logsTabControl.TabPages.Add(historyTab);
+            logsPanel.Controls.Add(logsTabControl);
+            LoadExecutionHistory();
 
             tabPage.Controls.Add(logsPanel);
 
@@ -1576,7 +1789,7 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 0.1.0-alpha",
+                Text = "Versão: 1.0.0",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -1710,8 +1923,18 @@ namespace GelitaITToolkit.Forms
         {
             try
             {
+                if (!_configService.TryLoadToolkitConfiguration(
+                        out _toolkitSettings,
+                        out _installerHashes,
+                        out var configurationErrors))
+                {
+                    throw new InvalidDataException(
+                        "Configuração inválida:\n• " + string.Join("\n• ", configurationErrors));
+                }
+
                 // Carregar unidades
                 _units = _configService.LoadUnits();
+                ApplyProgramDefinitions();
 
                 if (_units.Count > 0)
                 {
@@ -1733,8 +1956,8 @@ namespace GelitaITToolkit.Forms
                     AddLog($"{_units.Count} unidade(s) carregada(s)", LogLevel.Info);
                 }
 
-                // Carregar scanners
-                var scanners = _configService.LoadScanners();
+                // A lista é específica da máquina atual e vem do Epson Scan 2.
+                var scanners = new ScannerService().GetConfiguredEpsonScanners();
                 PopulateScannersList(scanners);
                 if (scanners.Count > 0)
                 {
@@ -1746,6 +1969,48 @@ namespace GelitaITToolkit.Forms
                 AddLog($"Erro ao carregar configuração: {ex.Message}", LogLevel.Error);
                 throw;
             }
+        }
+
+        private void ApplyProgramDefinitions()
+        {
+            var controlNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["epsonScan2"] = "InstallEpsonScanCheckbox",
+                ["naps2"] = "InstallNapsCheckbox",
+                ["sentinelOne"] = "InstallSentinelOneCheckbox",
+                ["office"] = "InstallOfficeCheckbox",
+                ["paloAlto"] = "InstallPaloAltoCheckbox"
+            };
+
+            foreach (var program in _toolkitSettings.Programs)
+            {
+                if (!controlNames.TryGetValue(program.Id, out var controlName))
+                    continue;
+
+                var checkBox = FindControl<CheckBox>(controlName);
+                if (checkBox == null)
+                    continue;
+
+                checkBox.Text = program.DisplayName;
+                checkBox.Enabled = program.Enabled;
+                if (!program.Enabled)
+                    checkBox.Checked = false;
+            }
+        }
+
+        private string GetConfiguredPath(string pathKey) =>
+            _configService.ResolveConfiguredPath(_toolkitSettings, pathKey);
+
+        private ProgramDefinition GetProgramDefinition(string programId) =>
+            _toolkitSettings.Programs.FirstOrDefault(
+                program => string.Equals(program.Id, programId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidDataException($"O programa '{programId}' não foi configurado.");
+
+        private string GetConfiguredHash(string hashKey)
+        {
+            if (!_installerHashes.Hashes.TryGetValue(hashKey, out var hash))
+                throw new InvalidDataException($"O hash '{hashKey}' não foi configurado.");
+            return hash;
         }
 
         private void PopulateScannersList(IEnumerable<Scanner> scanners)
@@ -1968,6 +2233,15 @@ namespace GelitaITToolkit.Forms
             string? workingDirectory = null,
             TimeSpan? timeout = null)
         {
+            return await RunProcessWithExitCodeAsync(fileName, arguments, workingDirectory, timeout) == 0;
+        }
+
+        private static async Task<int?> RunProcessWithExitCodeAsync(
+            string fileName,
+            string arguments,
+            string? workingDirectory = null,
+            TimeSpan? timeout = null)
+        {
             Process? process = null;
             try
             {
@@ -1980,17 +2254,17 @@ namespace GelitaITToolkit.Forms
                     CreateNoWindow = true
                 });
                 if (process == null)
-                    return false;
+                    return null;
 
                 using var timeoutSource = new System.Threading.CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(30));
                 await process.WaitForExitAsync(timeoutSource.Token);
-                return process.ExitCode == 0;
+                return process.ExitCode;
             }
             catch
             {
                 if (process is { HasExited: false })
                     process.Kill(entireProcessTree: true);
-                return false;
+                return null;
             }
             finally
             {
@@ -2288,7 +2562,10 @@ namespace GelitaITToolkit.Forms
             var printers = await _printerService.GetPrintersByUnit(unit);
             printersList.Items.Clear();
             foreach (var printer in printers)
-                printersList.Items.Add(printer, _printerService.IsPrinterInstalled(printer.Name));
+            {
+                printer.IsInstalled = _printerService.IsPrinterInstalled(printer.Name);
+                printersList.Items.Add(printer, false);
+            }
 
             AddLog($"{printers.Count} impressora(s) carregada(s) para {unit.Name}.", LogLevel.Info);
         }
@@ -2317,16 +2594,43 @@ namespace GelitaITToolkit.Forms
         /// <param name="level">O nível do log (Info, Warning, Error).</param>
         private void AddLog(string message, LogLevel level)
         {
-            if (_logsRichTextBox == null)
-                return;
-
             try
             {
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 string logEntry = $"[{timestamp}] [{level}] {message}\n";
 
-                _logsRichTextBox.AppendText(logEntry);
-                _logsRichTextBox.ScrollToCaret();
+                if (_logsRichTextBox != null)
+                {
+                    _logsRichTextBox.AppendText(logEntry);
+                    _logsRichTextBox.ScrollToCaret();
+                }
+
+                var historyDirectory = Path.GetDirectoryName(_historyFilePath);
+                if (!string.IsNullOrWhiteSpace(historyDirectory))
+                    Directory.CreateDirectory(historyDirectory);
+                File.AppendAllText(_historyFilePath, logEntry);
+
+                if (_historyRichTextBox != null)
+                {
+                    _historyRichTextBox.AppendText(logEntry);
+                    _historyRichTextBox.ScrollToCaret();
+                }
+
+                if (level == LogLevel.Error)
+                {
+                    if (message.Contains("Epson", StringComparison.OrdinalIgnoreCase))
+                        _installationErrors.Add("Epson");
+                    if (message.Contains("NAPS", StringComparison.OrdinalIgnoreCase))
+                        _installationErrors.Add("NAPS2");
+                    if (message.Contains("Sentinel", StringComparison.OrdinalIgnoreCase))
+                        _installationErrors.Add("Sentinel");
+                    if (message.Contains("Office", StringComparison.OrdinalIgnoreCase) ||
+                        message.Contains("ODT", StringComparison.OrdinalIgnoreCase))
+                        _installationErrors.Add("Office");
+                    if (message.Contains("GlobalProtect", StringComparison.OrdinalIgnoreCase) ||
+                        message.Contains("Palo Alto", StringComparison.OrdinalIgnoreCase))
+                        _installationErrors.Add("GlobalProtect");
+                }
             }
             catch
             {
@@ -2341,7 +2645,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 0.1.0-alpha\n\n" +
+                "Versão 1.0.0\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",
@@ -2483,6 +2787,106 @@ namespace GelitaITToolkit.Forms
             MessageBox.Show(summary, "Teste de Ping das Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        private async void PrintersSetDefaultButton_Click(object? sender, EventArgs e)
+        {
+            var printer = GetSingleCheckedPrinter("definir como padrão");
+            if (printer == null)
+                return;
+
+            var success = await _printerService.SetDefaultPrinter(printer);
+            AddLog(
+                success ? $"{printer.Name} definida como impressora padrão." : $"Não foi possível definir {printer.Name} como padrão.",
+                success ? LogLevel.Info : LogLevel.Error);
+            MessageBox.Show(
+                success ? $"{printer.Name} foi definida como impressora padrão." : "A impressora precisa estar instalada antes de ser definida como padrão.",
+                "Impressora Padrão",
+                MessageBoxButtons.OK,
+                success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private async void PrintersTestPageButton_Click(object? sender, EventArgs e)
+        {
+            var printer = GetSingleCheckedPrinter("imprimir uma página de teste");
+            if (printer == null)
+                return;
+
+            var success = await _printerService.PrintTestPage(printer);
+            AddLog(
+                success ? $"Página de teste enviada para {printer.Name}." : $"Falha ao enviar página de teste para {printer.Name}.",
+                success ? LogLevel.Info : LogLevel.Error);
+            MessageBox.Show(
+                success ? "A página de teste foi enviada." : "Não foi possível enviar a página de teste. Verifique se a impressora está instalada.",
+                "Página de Teste",
+                MessageBoxButtons.OK,
+                success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private async void PrintersPort9100Button_Click(object? sender, EventArgs e)
+        {
+            var unit = GetSelectedUnit();
+            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
+            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Selecione uma ou mais impressoras.", "Porta 9100", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var results = new List<string>();
+            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            {
+                var ipAddress = GetScannerIpForPrinter(unit, printer.Name);
+                if (string.IsNullOrWhiteSpace(ipAddress))
+                {
+                    results.Add($"{printer.Name}: IP não identificado.");
+                    continue;
+                }
+
+                var open = await _printerService.TestRawPrintPortAsync(ipAddress);
+                results.Add($"{printer.Name} ({ipAddress}): porta 9100 {(open ? "aberta" : "fechada ou indisponível")}.");
+            }
+
+            var summary = string.Join(Environment.NewLine, results);
+            AddLog($"Teste da porta 9100 concluído. {summary.Replace(Environment.NewLine, " | ")}", LogLevel.Info);
+            MessageBox.Show(summary, "Teste da Porta 9100", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private async void PrintersRemoveDuplicatesButton_Click(object? sender, EventArgs e)
+        {
+            var duplicates = _printerService.FindDuplicateInstalledPrinters();
+            if (duplicates.Count == 0)
+            {
+                MessageBox.Show("Nenhuma impressora duplicada foi encontrada.", "Impressoras Duplicadas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var summary = string.Join(Environment.NewLine, duplicates.Select(group => $"• {string.Join(" / ", group)}"));
+            if (MessageBox.Show(
+                    $"Foram encontrados {duplicates.Sum(group => group.Count - 1)} registro(s) duplicado(s):\n\n{summary}\n\nRemover as cópias e manter uma de cada fila?",
+                    "Impressoras Duplicadas",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            var removed = await _printerService.RemoveDuplicateInstalledPrinters();
+            AddLog($"{removed} impressora(s) duplicada(s) removida(s).", LogLevel.Info);
+            MessageBox.Show($"{removed} impressora(s) duplicada(s) removida(s).", "Impressoras Duplicadas", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var unit = GetSelectedUnit();
+            if (unit != null)
+                await LoadPrintersForUnitAsync(unit.Name);
+        }
+
+        private Printer? GetSingleCheckedPrinter(string action)
+        {
+            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
+            if (printersList == null || printersList.CheckedItems.Count != 1)
+            {
+                MessageBox.Show($"Marque exatamente uma impressora para {action}.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return null;
+            }
+
+            return printersList.CheckedItems[0] as Printer;
+        }
+
         private async void PrintersAddButton_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
@@ -2522,7 +2926,6 @@ namespace GelitaITToolkit.Forms
             }
 
             var epsonService = new ScannerService();
-            var scanners = _configService.LoadScanners();
             var added = new List<string>();
             var failed = new List<string>();
 
@@ -2548,48 +2951,99 @@ namespace GelitaITToolkit.Forms
                     continue;
                 }
 
-                scanners.RemoveAll(configured => string.Equals(configured.IpAddress, ipAddress, StringComparison.OrdinalIgnoreCase));
-                scanners.Add(scanner);
                 added.Add($"{printerName} ({ipAddress})");
                 AddLog(epsonMessage, LogLevel.Info);
             }
 
-            if (added.Count > 0 && _configService.SaveScanners(scanners))
-                PopulateScannersList(scanners);
+            if (added.Count > 0)
+                PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
 
             var message = $"Adicionados ({added.Count}):\n{string.Join(Environment.NewLine, added)}";
             if (failed.Count > 0)
                 message += $"\n\nNão adicionados ({failed.Count}):\n{string.Join(Environment.NewLine, failed)}";
+            if (added.Count > 0)
+                message += "\n\nAntes de usar no NAPS2, clique em “Validar Todos no Epson Scan 2”.";
             MessageBox.Show(message, "Adicionar Scanners", MessageBoxButtons.OK, failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
         private void ScannersRemoveButton_Click(object sender, EventArgs e)
         {
             var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList?.SelectedItem is not Scanner scanner)
+            var selectedScanners = scannersList?.SelectedItems.Cast<Scanner>().ToList() ?? new List<Scanner>();
+            if (selectedScanners.Count == 0)
             {
-                MessageBox.Show("Selecione um scanner na lista para remover.", "Remover Scanner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Selecione um ou mais scanners na lista para remover.", "Remover Scanners", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            if (MessageBox.Show($"Remover o scanner {scanner.Name} ({scanner.IpAddress})?", "Remover Scanner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            var selectedSummary = string.Join(
+                Environment.NewLine,
+                selectedScanners.Select(scanner => $"• {scanner.Name} ({scanner.IpAddress})"));
+            if (MessageBox.Show(
+                    $"Remover os scanners selecionados do Epson Scan 2 e do NAPS2?\n\n{selectedSummary}",
+                    "Remover Scanners",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
             var epsonService = new ScannerService();
-            var removedFromEpson = epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var epsonMessage);
-            var scanners = _configService.LoadScanners();
-            scanners.RemoveAll(configured => string.Equals(configured.IpAddress, scanner.IpAddress, StringComparison.OrdinalIgnoreCase));
-            if (_configService.SaveScanners(scanners))
-                PopulateScannersList(scanners);
+            var removedFromEpson = new List<string>();
+            var failedInEpson = new List<string>();
+            foreach (var scanner in selectedScanners)
+            {
+                if (epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var epsonMessage))
+                {
+                    removedFromEpson.Add(scanner.Name);
+                    AddLog(epsonMessage, LogLevel.Info);
+                }
+                else
+                {
+                    failedInEpson.Add($"{scanner.Name}: {epsonMessage}");
+                    AddLog(epsonMessage, LogLevel.Warning);
+                }
+            }
 
-            AddLog(epsonMessage, removedFromEpson ? LogLevel.Info : LogLevel.Warning);
+            var naps2Service = new Naps2ProfileService();
+            var removedFromNaps2 = naps2Service.TryRemoveEpsonProfiles(selectedScanners, out var naps2Message);
+            AddLog(naps2Message, removedFromNaps2 ? LogLevel.Info : LogLevel.Error);
+            PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+
+            var resultMessage =
+                $"Removidos do Epson Scan 2: {removedFromEpson.Count}.\n" +
+                $"{naps2Message}";
+            if (failedInEpson.Count > 0)
+                resultMessage += $"\n\nNão removidos do Epson Scan 2:\n{string.Join(Environment.NewLine, failedInEpson)}";
+
             MessageBox.Show(
-                removedFromEpson
-                    ? $"Scanner removido com sucesso.\n\n{epsonMessage}"
-                    : $"O scanner foi removido da lista do Toolkit.\n\n{epsonMessage}",
-                "Remover Scanner",
+                resultMessage,
+                "Remover Scanners",
                 MessageBoxButtons.OK,
-                removedFromEpson ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                failedInEpson.Count == 0 && removedFromNaps2 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private void ScannersRemoveDuplicatesButton_Click(object? sender, EventArgs e)
+        {
+            if (MessageBox.Show(
+                    "O Toolkit removerá conexões repetidas pelo mesmo IP no Epson Scan 2 e perfis repetidos pelo mesmo nome no NAPS2. Backups serão criados antes das alterações.\n\nDeseja continuar?",
+                    "Limpar Scanners Duplicados",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            var epsonService = new ScannerService();
+            var epsonSuccess = epsonService.TryRemoveDuplicateEpsonScanners(out var epsonMessage);
+            var naps2Service = new Naps2ProfileService();
+            var naps2Success = naps2Service.TryRemoveDuplicateProfiles(out var naps2Message);
+
+            AddLog(epsonMessage, epsonSuccess ? LogLevel.Info : LogLevel.Error);
+            AddLog(naps2Message, naps2Success ? LogLevel.Info : LogLevel.Error);
+            PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+
+            MessageBox.Show(
+                $"{epsonMessage}\n\n{naps2Message}",
+                "Limpar Scanners Duplicados",
+                MessageBoxButtons.OK,
+                epsonSuccess && naps2Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
         private async void ScannersPingButton_Click(object sender, EventArgs e)
@@ -2619,9 +3073,287 @@ namespace GelitaITToolkit.Forms
             }
         }
 
+        private async void ScannersValidateEpsonButton_Click(object? sender, EventArgs e)
+        {
+            var epsonService = new ScannerService();
+            var scanners = epsonService.GetConfiguredEpsonScanners();
+            if (scanners.Count == 0)
+            {
+                MessageBox.Show(
+                    "Nenhum scanner configurado foi encontrado no Epson Scan 2.",
+                    "Epson Scan 2",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var settingsExecutable = FindEpsonScannerSettingsExecutable();
+            if (settingsExecutable == null)
+            {
+                MessageBox.Show(
+                    "O utilitário Epson Scan 2 Scanner Settings não foi encontrado.",
+                    "Epson Scan 2",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            var scannerSummary = string.Join(
+                Environment.NewLine,
+                scanners.Select(scanner => $"• {scanner.Name} ({scanner.IpAddress})"));
+            if (MessageBox.Show(
+                    $"Serão validados {scanners.Count} scanner(s):\n\n{scannerSummary}\n\n" +
+                    "1. O Epson Scan 2 será aberto como administrador. Teste todas as conexões e feche a janela.\n" +
+                    "2. Em seguida ele será aberto no usuário normal. Teste todas novamente e feche a janela.\n" +
+                    "3. Após a confirmação, todos os perfis serão adicionados ou atualizados no NAPS2.\n\n" +
+                    "Deseja continuar?",
+                    "Validar Todos no Epson Scan 2",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Information) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                AddLog($"Iniciando validação administrativa de {scanners.Count} scanner(s) no Epson Scan 2.", LogLevel.Info);
+                using (var elevatedProcess = Process.Start(new ProcessStartInfo
+                {
+                    FileName = settingsExecutable,
+                    WorkingDirectory = Path.GetDirectoryName(settingsExecutable) ?? string.Empty,
+                    UseShellExecute = true,
+                    Verb = "runas"
+                }))
+                {
+                    if (elevatedProcess == null)
+                        throw new InvalidOperationException("Não foi possível iniciar o Epson Scan 2 como administrador.");
+
+                    await elevatedProcess.WaitForExitAsync();
+                }
+
+                MessageBox.Show(
+                    "Etapa administrativa concluída.\n\nAgora o Epson Scan 2 será aberto no contexto do usuário normal. Teste novamente todas as conexões e feche a janela.",
+                    "Validar Epson Scan 2",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                var explorerPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    "explorer.exe");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = explorerPath,
+                    UseShellExecute = false,
+                    ArgumentList = { settingsExecutable }
+                });
+
+                AddLog($"Epson Scan 2 aberto no contexto do usuário para validar {scanners.Count} scanner(s).", LogLevel.Info);
+                if (MessageBox.Show(
+                        "Teste todas as conexões no Epson Scan 2 aberto no usuário normal e feche a janela.\n\n" +
+                        "Todas as conexões funcionaram e você deseja adicionar ou atualizar todos os perfis no NAPS2?",
+                        "Adicionar Todos ao NAPS2",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) == DialogResult.Yes)
+                {
+                    var naps2Service = new Naps2ProfileService();
+                    var added = new List<string>();
+                    var failed = new List<string>();
+                    foreach (var scanner in scanners)
+                    {
+                        var profileCreated = naps2Service.TryAddOrUpdateEpsonProfile(scanner, out var naps2Message);
+                        AddLog(naps2Message, profileCreated ? LogLevel.Info : LogLevel.Error);
+                        if (profileCreated)
+                            added.Add(scanner.Name);
+                        else
+                            failed.Add($"{scanner.Name}: {naps2Message}");
+                    }
+
+                    var naps2Summary = $"{added.Count} perfil(is) adicionado(s) ou atualizado(s) no NAPS2.";
+                    if (failed.Count > 0)
+                        naps2Summary += $"\n\nFalhas:\n{string.Join(Environment.NewLine, failed)}";
+                    MessageBox.Show(
+                        $"{naps2Summary}\n\nAbra ou reinicie o NAPS2 para carregar os perfis.",
+                        "NAPS2",
+                        MessageBoxButtons.OK,
+                        failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                }
+
+                PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                AddLog("Validação administrativa do Epson Scan 2 cancelada pelo usuário.", LogLevel.Warning);
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha ao abrir o Epson Scan 2 para validação: {ex.Message}", LogLevel.Error);
+                MessageBox.Show(
+                    $"Não foi possível concluir a abertura do Epson Scan 2:\n\n{ex.Message}",
+                    "Epson Scan 2",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private static string? FindEpsonScannerSettingsExecutable()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "EPSON", "Epson Scan 2", "Core", "es2devedit.exe"),
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    "EPSON", "Epson Scan 2", "Core", "es2devedit.exe")
+            };
+
+            return candidates.FirstOrDefault(File.Exists);
+        }
+
         // ==== ABA INSTALAÇÕES ====
 
+        private void InstallationsSearchTextBox_TextChanged(object? sender, EventArgs e)
+        {
+            var search = (sender as TextBox)?.Text.Trim() ?? string.Empty;
+            var mappings = new[]
+            {
+                ("InstallEpsonScanCheckbox", "InstallEpsonScanStatusLabel"),
+                ("InstallNapsCheckbox", "InstallNapsStatusLabel"),
+                ("InstallSentinelOneCheckbox", "InstallSentinelOneStatusLabel"),
+                ("InstallOfficeCheckbox", "InstallOfficeStatusLabel"),
+                ("InstallPaloAltoCheckbox", "InstallPaloAltoStatusLabel")
+            };
+
+            foreach (var (checkBoxName, labelName) in mappings)
+            {
+                var checkBox = FindControl<CheckBox>(checkBoxName);
+                var statusLabel = FindControl<Label>(labelName);
+                if (checkBox == null)
+                    continue;
+
+                var visible = string.IsNullOrWhiteSpace(search) ||
+                              checkBox.Text.Contains(search, StringComparison.OrdinalIgnoreCase);
+                checkBox.Visible = visible;
+                if (statusLabel != null)
+                    statusLabel.Visible = visible;
+            }
+        }
+
+        private void InstallationsExecuteAllButton_Click(object? sender, EventArgs e)
+        {
+            foreach (var name in new[]
+                     {
+                         "InstallEpsonScanCheckbox",
+                         "InstallNapsCheckbox",
+                         "InstallSentinelOneCheckbox",
+                         "InstallOfficeCheckbox",
+                         "InstallPaloAltoCheckbox"
+                     })
+            {
+                var checkBox = FindControl<CheckBox>(name);
+                if (checkBox is { Visible: true })
+                    checkBox.Checked = true;
+            }
+
+            InstallationsInstallButton_Click(sender, e);
+        }
+
+        private void RefreshInstallationStatuses()
+        {
+            SetInstallationStatus("Epson", "InstallEpsonScanStatusLabel",
+                IsSoftwareInstalled("Epson Scan 2") ||
+                Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "EPSON", "Epson Scan 2")));
+            SetInstallationStatus("NAPS2", "InstallNapsStatusLabel", IsSoftwareInstalled("NAPS2"));
+            SetInstallationStatus("Sentinel", "InstallSentinelOneStatusLabel", IsSoftwareInstalled("Sentinel"));
+            SetInstallationStatus("Office", "InstallOfficeStatusLabel",
+                IsSoftwareInstalled("Microsoft 365") || IsSoftwareInstalled("Microsoft Office"));
+            SetInstallationStatus("GlobalProtect", "InstallPaloAltoStatusLabel",
+                IsSoftwareInstalled("GlobalProtect"));
+        }
+
+        private void SetInstallationStatus(string softwareKey, string labelName, bool installed)
+        {
+            var label = FindControl<Label>(labelName);
+            if (label == null)
+                return;
+
+            if (_installationErrors.Contains(softwareKey))
+            {
+                label.Text = "● Erro";
+                label.ForeColor = Color.Firebrick;
+            }
+            else
+            {
+                label.Text = installed ? "● Instalado" : "● Ausente";
+                label.ForeColor = installed ? Color.ForestGreen : Color.DarkOrange;
+            }
+        }
+
+        private static bool IsSoftwareInstalled(string displayNameFragment)
+        {
+            var registryPaths = new[]
+            {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+            };
+
+            foreach (var hive in new[] { Registry.LocalMachine, Registry.CurrentUser })
+            {
+                foreach (var registryPath in registryPaths)
+                {
+                    try
+                    {
+                        using var uninstallKey = hive.OpenSubKey(registryPath);
+                        if (uninstallKey == null)
+                            continue;
+
+                        foreach (var subKeyName in uninstallKey.GetSubKeyNames())
+                        {
+                            using var applicationKey = uninstallKey.OpenSubKey(subKeyName);
+                            var applicationName = applicationKey?.GetValue("DisplayName")?.ToString();
+                            if (applicationName?.Contains(displayNameFragment, StringComparison.OrdinalIgnoreCase) == true)
+                                return true;
+                        }
+                    }
+                    catch
+                    {
+                        // Mantém a verificação nas demais áreas do Registro.
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private async void InstallationsInstallButton_Click(object? sender, EventArgs e)
+        {
+            var installButton = FindControl<Button>("InstallationsInstallButton");
+            var executeAllButton = FindControl<Button>("InstallationsExecuteAllButton");
+            try
+            {
+                _installationErrors.Clear();
+                if (installButton != null)
+                    installButton.Enabled = false;
+                if (executeAllButton != null)
+                    executeAllButton.Enabled = false;
+                _installationsProgressBar.Style = ProgressBarStyle.Marquee;
+                _installationsProgressBar.MarqueeAnimationSpeed = 25;
+                _installationsProgressLabel.Text = "Executando instalações...";
+
+                await ExecuteSelectedInstallationsAsync();
+            }
+            finally
+            {
+                _installationsProgressBar.Style = ProgressBarStyle.Continuous;
+                _installationsProgressBar.Value = 100;
+                _installationsProgressLabel.Text = "Execução concluída";
+                if (installButton != null)
+                    installButton.Enabled = true;
+                if (executeAllButton != null)
+                    executeAllButton.Enabled = true;
+                RefreshInstallationStatuses();
+            }
+        }
+
+        private async Task ExecuteSelectedInstallationsAsync()
         {
             var napsCheckbox = FindControl<CheckBox>("InstallNapsCheckbox");
             var epsonCheckbox = FindControl<CheckBox>("InstallEpsonScanCheckbox");
@@ -2643,20 +3375,21 @@ namespace GelitaITToolkit.Forms
                 var model = PromptForOption("Driver Epson + Epson Scan 2", "Selecione o modelo da impressora/scanner:", "Epson WF-C5899", "Epson WF-M5899");
                 if (model != null)
                 {
-                    var epsonDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "EpsonScan2");
+                    var epsonProgram = GetProgramDefinition("epsonScan2");
+                    var epsonDirectory = GetConfiguredPath(epsonProgram.PathKey);
                     var fileToken = model.Contains("M5899", StringComparison.OrdinalIgnoreCase) ? "M5899" : "C5890";
                     var installer = Directory.Exists(epsonDirectory)
-                        ? Directory.EnumerateFiles(epsonDirectory, "*.exe").FirstOrDefault(file => Path.GetFileName(file).Contains(fileToken, StringComparison.OrdinalIgnoreCase))
+                        ? Directory.EnumerateFiles(epsonDirectory, epsonProgram.InstallerPattern).FirstOrDefault(file => Path.GetFileName(file).Contains(fileToken, StringComparison.OrdinalIgnoreCase))
                         : null;
 
                     if (installer == null)
                     {
-                        MessageBox.Show($"Instalador do Epson Scan 2 para {model} não encontrado em Assets\\EpsonScan2.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show($"Instalador do Epson Scan 2 para {model} não encontrado em {epsonDirectory}.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         AddLog($"Instalador Epson Scan 2 não encontrado para {model}.", LogLevel.Warning);
                     }
                     else if (!SecurityHelper.HasExpectedSha256(
                                  installer,
-                                 fileToken == "M5899" ? EpsonM5899Sha256 : EpsonC5890Sha256))
+                                 GetConfiguredHash(fileToken == "M5899" ? "epsonM5899" : "epsonC5890")))
                     {
                         MessageBox.Show(
                             "A integridade do instalador Epson não pôde ser confirmada. A execução foi bloqueada.",
@@ -2667,7 +3400,7 @@ namespace GelitaITToolkit.Forms
                     }
                     else
                     {
-                        var installed = await RunProcessAsync(installer, "/S");
+                        var installed = await RunProcessAsync(installer, epsonProgram.Arguments);
                         AddLog(installed
                             ? $"Driver Epson e Epson Scan 2 instalados para {model}."
                             : $"A instalação silenciosa do driver Epson retornou falha para {model}.",
@@ -2681,18 +3414,19 @@ namespace GelitaITToolkit.Forms
 
             if (napsCheckbox?.Checked == true)
             {
-                var napsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "NAPS");
+                var napsProgram = GetProgramDefinition("naps2");
+                var napsDirectory = GetConfiguredPath(napsProgram.PathKey);
                 var installer = Directory.Exists(napsDirectory)
-                    ? Directory.EnumerateFiles(napsDirectory, "*.msi").FirstOrDefault() ?? Directory.EnumerateFiles(napsDirectory, "*.exe").FirstOrDefault()
+                    ? Directory.EnumerateFiles(napsDirectory, napsProgram.InstallerPattern).FirstOrDefault() ?? Directory.EnumerateFiles(napsDirectory, "*.exe").FirstOrDefault()
                     : null;
                 if (installer == null)
                 {
-                    MessageBox.Show("Instalador do NAPS2 não encontrado em Assets\\NAPS.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Instalador do NAPS2 não encontrado em {napsDirectory}.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     AddLog("Instalador do NAPS2 não encontrado.", LogLevel.Warning);
                     return;
                 }
 
-                if (!SecurityHelper.HasExpectedSha256(installer, NapsSha256))
+                if (!SecurityHelper.HasExpectedSha256(installer, GetConfiguredHash("naps2")))
                 {
                     MessageBox.Show(
                         "A integridade do instalador NAPS2 não pôde ser confirmada. A execução foi bloqueada.",
@@ -2704,8 +3438,8 @@ namespace GelitaITToolkit.Forms
                 }
 
                 var installed = Path.GetExtension(installer).Equals(".msi", StringComparison.OrdinalIgnoreCase)
-                    ? await RunProcessAsync("msiexec.exe", $"/i \"{installer}\" /qn /norestart")
-                    : await RunProcessAsync(installer, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-");
+                    ? await RunProcessAsync("msiexec.exe", $"/i \"{installer}\" {napsProgram.Arguments}")
+                    : await RunProcessAsync(installer, napsProgram.Arguments);
 
                 AddLog(installed
                     ? "Instalação silenciosa do NAPS2 concluída."
@@ -2718,21 +3452,22 @@ namespace GelitaITToolkit.Forms
 
             if (sentinelOneCheckbox?.Checked == true)
             {
-                var sentinelOneDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "SentinelOne");
+                var sentinelProgram = GetProgramDefinition("sentinelOne");
+                var sentinelOneDirectory = GetConfiguredPath(sentinelProgram.PathKey);
                 var installer = Directory.Exists(sentinelOneDirectory)
-                    ? Directory.EnumerateFiles(sentinelOneDirectory, "*.bat").FirstOrDefault()
+                    ? Directory.EnumerateFiles(sentinelOneDirectory, sentinelProgram.InstallerPattern).FirstOrDefault()
                     : null;
-                var sentinelMsi = Path.Combine(sentinelOneDirectory, "SentinelInstaller_windows_64bit_v23_1_4_650.msi");
+                var sentinelMsi = GetConfiguredPath("sentinelMsi");
 
                 if (installer == null)
                 {
-                    MessageBox.Show("Script do SentinelOne não encontrado em Assets\\SentinelOne.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Script do SentinelOne não encontrado em {sentinelOneDirectory}.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     AddLog("Script de instalação do SentinelOne não encontrado.", LogLevel.Warning);
                     return;
                 }
 
-                if (!SecurityHelper.HasExpectedSha256(installer, SentinelScriptSha256) ||
-                    !SecurityHelper.HasExpectedSha256(sentinelMsi, SentinelMsiSha256))
+                if (!SecurityHelper.HasExpectedSha256(installer, GetConfiguredHash("sentinelScript")) ||
+                    !SecurityHelper.HasExpectedSha256(sentinelMsi, GetConfiguredHash("sentinelMsi")))
                 {
                     MessageBox.Show(
                         "A integridade do pacote SentinelOne não pôde ser confirmada. A execução foi bloqueada.",
@@ -2755,9 +3490,10 @@ namespace GelitaITToolkit.Forms
 
             if (officeCheckbox?.Checked == true)
             {
-                const string odtDirectory = @"C:\ODT";
-                var setupPath = Path.Combine(odtDirectory, "setup.exe");
-                var configurationPath = Path.Combine(odtDirectory, "Configuração.xml");
+                var officeProgram = GetProgramDefinition("office");
+                var odtDirectory = GetConfiguredPath(officeProgram.PathKey);
+                var setupPath = Path.Combine(odtDirectory, officeProgram.InstallerPattern);
+                var configurationPath = GetConfiguredPath("officeConfiguration");
 
                 if (!File.Exists(setupPath) || !File.Exists(configurationPath))
                 {
@@ -2788,7 +3524,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 if (MessageBox.Show(
-                        "O Microsoft Office será instalado usando C:\\ODT\\Configuração.xml. O processo pode levar vários minutos. Deseja continuar?",
+                        $"O Microsoft Office será instalado usando {configurationPath}. O processo pode levar vários minutos. Deseja continuar?",
                         "Instalar Microsoft Office",
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Question) != DialogResult.Yes)
@@ -2798,7 +3534,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 AddLog("Iniciando instalação do Microsoft Office pelo ODT.", LogLevel.Info);
-                var installed = await RunProcessAsync(setupPath, "/configure \"Configuração.xml\"", odtDirectory);
+                var installed = await RunProcessAsync(setupPath, officeProgram.Arguments, odtDirectory);
                 AddLog(
                     installed
                         ? "Instalação do Microsoft Office concluída pelo ODT."
@@ -2816,13 +3552,14 @@ namespace GelitaITToolkit.Forms
 
             if (paloAltoCheckbox?.Checked == true)
             {
-                var paloAltoDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "PaloAlto Client");
-                var installer = Path.Combine(paloAltoDirectory, "GlobalProtect64.msi");
+                var paloAltoProgram = GetProgramDefinition("paloAlto");
+                var paloAltoDirectory = GetConfiguredPath(paloAltoProgram.PathKey);
+                var installer = Path.Combine(paloAltoDirectory, paloAltoProgram.InstallerPattern);
 
                 if (!File.Exists(installer))
                 {
                     MessageBox.Show(
-                        "Instalador não encontrado em Assets\\PaloAlto Client\\GlobalProtect64.msi.",
+                        $"Instalador não encontrado: {installer}.",
                         "Palo Alto GlobalProtect",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
@@ -2830,7 +3567,7 @@ namespace GelitaITToolkit.Forms
                     return;
                 }
 
-                if (!SecurityHelper.HasExpectedSha256(installer, PaloAltoSha256))
+                if (!SecurityHelper.HasExpectedSha256(installer, GetConfiguredHash("paloAlto")))
                 {
                     MessageBox.Show(
                         "A integridade do instalador GlobalProtect não pôde ser confirmada. A execução foi bloqueada.",
@@ -2842,21 +3579,32 @@ namespace GelitaITToolkit.Forms
                 }
 
                 AddLog("Iniciando instalação silenciosa do Palo Alto GlobalProtect.", LogLevel.Info);
-                var installed = await RunProcessAsync(
+                var exitCode = await RunProcessWithExitCodeAsync(
                     "msiexec.exe",
-                    $"/i \"{installer}\" /quiet /norestart",
+                    $"/i \"{installer}\" {paloAltoProgram.Arguments}",
                     paloAltoDirectory);
+                var installed = exitCode is 0 or 1641 or 3010 or 1638;
+                var requiresRestart = exitCode is 1641 or 3010;
+                var alreadyInstalled = exitCode == 1638;
 
                 AddLog(
                     installed
-                        ? "Instalação do Palo Alto GlobalProtect concluída."
-                        : "A instalação do Palo Alto GlobalProtect retornou falha.",
+                        ? alreadyInstalled
+                            ? "O Palo Alto GlobalProtect já está instalado ou há uma versão mais recente."
+                            : requiresRestart
+                                ? $"Instalação do Palo Alto GlobalProtect concluída; reinicialização necessária (código MSI {exitCode})."
+                                : "Instalação do Palo Alto GlobalProtect concluída."
+                        : $"A instalação do Palo Alto GlobalProtect retornou falha (código MSI {exitCode?.ToString() ?? "indisponível"}).",
                     installed ? LogLevel.Info : LogLevel.Error);
 
                 MessageBox.Show(
                     installed
-                        ? "O Palo Alto GlobalProtect foi instalado."
-                        : "O Palo Alto GlobalProtect não foi instalado. Execute o Toolkit como administrador e verifique o log.",
+                        ? alreadyInstalled
+                            ? "O Palo Alto GlobalProtect já está instalado ou existe uma versão mais recente."
+                            : requiresRestart
+                                ? "O Palo Alto GlobalProtect foi instalado. Reinicie o computador para concluir."
+                                : "O Palo Alto GlobalProtect foi instalado."
+                        : $"O Palo Alto GlobalProtect não foi instalado (código MSI {exitCode?.ToString() ?? "indisponível"}). Execute o Toolkit como administrador e verifique o log.",
                     "Palo Alto GlobalProtect",
                     MessageBoxButtons.OK,
                     installed ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
@@ -2958,26 +3706,20 @@ namespace GelitaITToolkit.Forms
             AddLog("Gerenciador de Dispositivos aberto.", LogLevel.Info);
         }
 
-        private async void ToolsSpoolCleanButton_Click(object? sender, EventArgs e)
+        private void ToolsSpoolCleanButton_Click(object? sender, EventArgs e)
         {
-            if (MessageBox.Show("Isso cancelará todos os trabalhos de impressão pendentes. Deseja continuar?", "Limpar Spooler", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-
-            var stopped = await RunProcessAsync("sc.exe", "stop spooler");
-            if (!stopped)
-            {
-                MessageBox.Show("Não foi possível parar o serviço de impressão. Execute como administrador.", "Limpar Spooler", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            var spoolDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "spool", "PRINTERS");
-            if (Directory.Exists(spoolDirectory))
-            {
-                foreach (var file in Directory.EnumerateFiles(spoolDirectory))
-                    File.Delete(file);
-            }
-            var started = await RunProcessAsync("sc.exe", "start spooler");
-            AddLog(started ? "Spooler limpo e reiniciado." : "Spooler limpo, mas não foi possível reiniciá-lo.", started ? LogLevel.Info : LogLevel.Error);
+            const string script =
+                "Stop-Service -Name Spooler -Force -ErrorAction Stop;" +
+                "$spool=Join-Path $env:WINDIR 'System32\\spool\\PRINTERS';" +
+                "if(Test-Path -LiteralPath $spool){" +
+                "Get-ChildItem -LiteralPath $spool -File -Force -ErrorAction SilentlyContinue | " +
+                "Remove-Item -Force -ErrorAction SilentlyContinue};" +
+                "Start-Service -Name Spooler -ErrorAction Stop;" +
+                "Write-Host 'Spooler limpo e reiniciado.'";
+            LaunchElevatedPowerShellCommand(
+                "Limpar e Reiniciar Spooler",
+                script,
+                "Todos os trabalhos de impressão pendentes serão cancelados e o serviço de impressão será reiniciado.");
         }
 
         private async void ToolsRestartSpoolerButton_Click(object? sender, EventArgs e)
@@ -2992,6 +3734,233 @@ namespace GelitaITToolkit.Forms
             }
             else
                 MessageBox.Show("Não foi possível reiniciar o serviço. Execute o aplicativo como administrador.", "Serviço de Impressão", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        private void ToolsDiskCleanupButton_Click(object? sender, EventArgs e)
+        {
+            if (MessageBox.Show(
+                    "A Limpeza de Disco do Windows será aberta para a unidade C:. Revise os itens antes de confirmar a exclusão.",
+                    "Limpeza de Disco",
+                    MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Information) != DialogResult.OK)
+            {
+                AddLog("Abertura da Limpeza de Disco cancelada pelo usuário.", LogLevel.Info);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.System),
+                        "cleanmgr.exe"),
+                    Arguments = "/d C:",
+                    UseShellExecute = true
+                });
+                AddLog("Limpeza de Disco aberta para a unidade C:.", LogLevel.Info);
+                UpdateStatusLabel("Limpeza de Disco aberta.");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Não foi possível abrir a Limpeza de Disco: {ex.Message}", LogLevel.Error);
+                MessageBox.Show(
+                    "Não foi possível abrir a Limpeza de Disco do Windows.",
+                    "Limpeza de Disco",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void ToolsSfcButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "SFC /scannow",
+                "sfc /scannow",
+                "O SFC verificará e tentará reparar os arquivos protegidos do Windows. O processo pode demorar.");
+        }
+
+        private void ToolsCleanTemporaryFilesButton_Click(object? sender, EventArgs e)
+        {
+            const string script =
+                "$targets=@($env:TEMP,(Join-Path $env:WINDIR 'Temp'));" +
+                "foreach($target in $targets){" +
+                "if(Test-Path -LiteralPath $target){" +
+                "Get-ChildItem -LiteralPath $target -Force -ErrorAction SilentlyContinue | " +
+                "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue}};" +
+                "Write-Host 'Limpeza de arquivos temporarios concluida.'";
+            LaunchElevatedPowerShellCommand(
+                "Limpar Arquivos Temporários",
+                script,
+                "Serão removidos os arquivos que não estiverem em uso nas pastas temporárias do usuário e do Windows.");
+        }
+
+        private void ToolsRenewIpAndDnsButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "Renovar IP e Limpar DNS",
+                "ipconfig /release && ipconfig /renew && ipconfig /flushdns",
+                "A conexão de rede será interrompida brevemente enquanto o endereço IP é renovado e o cache DNS é limpo.");
+        }
+
+        private void ToolsResetWinsockButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "Redefinir Winsock",
+                "netsh winsock reset",
+                "O catálogo Winsock será redefinido. Será necessário reiniciar o computador para concluir.");
+        }
+
+        private void ToolsRestartNetworkServicesButton_Click(object? sender, EventArgs e)
+        {
+            const string script =
+                "$services=@('Dhcp','Dnscache','NlaSvc','netprofm');" +
+                "foreach($service in $services){" +
+                "Write-Host \"Reiniciando $service...\";" +
+                "Restart-Service -Name $service -Force -ErrorAction Continue};" +
+                "Write-Host 'Reinicio dos servicos de rede concluido.'";
+            LaunchElevatedPowerShellCommand(
+                "Reiniciar Serviços de Rede",
+                script,
+                "Os principais serviços de rede serão reiniciados e a conexão poderá ficar indisponível por alguns instantes.");
+        }
+
+        private void ToolsRepairWindowsUpdateButton_Click(object? sender, EventArgs e)
+        {
+            const string script =
+                "$stamp=Get-Date -Format 'yyyyMMddHHmmss';" +
+                "Stop-Service -Name wuauserv,bits,cryptsvc -Force -ErrorAction Continue;" +
+                "$softwareDistribution=Join-Path $env:WINDIR 'SoftwareDistribution';" +
+                "$catroot=Join-Path $env:WINDIR 'System32\\catroot2';" +
+                "if(Test-Path -LiteralPath $softwareDistribution){" +
+                "Rename-Item -LiteralPath $softwareDistribution -NewName \"SoftwareDistribution.toolkit.$stamp\" -ErrorAction Continue};" +
+                "if(Test-Path -LiteralPath $catroot){" +
+                "Rename-Item -LiteralPath $catroot -NewName \"catroot2.toolkit.$stamp\" -ErrorAction Continue};" +
+                "Start-Service -Name cryptsvc,bits,wuauserv -ErrorAction Continue;" +
+                "Start-Process -FilePath 'UsoClient.exe' -ArgumentList 'StartScan' -ErrorAction SilentlyContinue;" +
+                "Write-Host 'Reparo do Windows Update concluido. Os caches antigos foram preservados com data e hora.'";
+            LaunchElevatedPowerShellCommand(
+                "Reparar Windows Update",
+                script,
+                "Os serviços do Windows Update serão reiniciados e os caches atuais serão renomeados como backup. Uma nova verificação será iniciada.");
+        }
+
+        private void ToolsWingetUpdateAllButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "Atualizar Tudo com winget",
+                "winget upgrade --all --accept-source-agreements --accept-package-agreements",
+                "O winget tentará atualizar todos os aplicativos compatíveis. Alguns instaladores podem solicitar interação ou reinicialização.");
+        }
+
+        private void ToolsDismScanButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "DISM ScanHealth",
+                "DISM /Online /Cleanup-Image /ScanHealth",
+                "O DISM verificará se a imagem do Windows possui corrupção. O processo pode demorar.");
+        }
+
+        private void ToolsDismRestoreButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "DISM RestoreHealth",
+                "DISM /Online /Cleanup-Image /RestoreHealth",
+                "O DISM tentará reparar a imagem do Windows e poderá usar o Windows Update.");
+        }
+
+        private void ToolsChkdskScanButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "CHKDSK online",
+                "chkdsk C: /scan",
+                "O disco C: será verificado online. Esta opção normalmente não exige reinicialização.");
+        }
+
+        private void ToolsChkdskRepairButton_Click(object? sender, EventArgs e)
+        {
+            LaunchElevatedSystemCommand(
+                "CHKDSK com correção",
+                "chkdsk C: /f",
+                "O CHKDSK tentará corrigir o disco C:. Como a unidade está em uso, confirme no Prompt para agendar a execução na próxima reinicialização. O Toolkit não reiniciará o computador automaticamente.");
+        }
+
+        private void LaunchElevatedSystemCommand(string title, string command, string explanation)
+        {
+            if (MessageBox.Show(
+                    $"{explanation}\n\nDeseja abrir o comando como administrador?",
+                    title,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                AddLog($"{title} cancelado pelo usuário.", LogLevel.Info);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/k \"title {title} && {command}\"",
+                    Verb = "runas",
+                    UseShellExecute = true
+                });
+                AddLog($"{title} iniciado em uma janela administrativa.", LogLevel.Info);
+                UpdateStatusLabel($"{title} iniciado.");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Não foi possível iniciar {title}: {ex.Message}", LogLevel.Error);
+                MessageBox.Show(
+                    "Não foi possível abrir o comando como administrador. A solicitação do Windows pode ter sido cancelada.",
+                    title,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void LaunchElevatedPowerShellCommand(string title, string script, string explanation)
+        {
+            if (MessageBox.Show(
+                    $"{explanation}\n\nDeseja executar como administrador?",
+                    title,
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                AddLog($"{title} cancelado pelo usuário.", LogLevel.Info);
+                return;
+            }
+
+            try
+            {
+                var encodedCommand = Convert.ToBase64String(
+                    System.Text.Encoding.Unicode.GetBytes(script));
+                var powershellPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                    "System32",
+                    "WindowsPowerShell",
+                    "v1.0",
+                    "powershell.exe");
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = powershellPath,
+                    Arguments = $"-NoLogo -NoProfile -NoExit -EncodedCommand {encodedCommand}",
+                    Verb = "runas",
+                    UseShellExecute = true
+                });
+                AddLog($"{title} iniciado em uma janela administrativa.", LogLevel.Info);
+                UpdateStatusLabel($"{title} iniciado.");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Não foi possível iniciar {title}: {ex.Message}", LogLevel.Error);
+                MessageBox.Show(
+                    "Não foi possível abrir o reparo como administrador. A solicitação do Windows pode ter sido cancelada.",
+                    title,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
         }
 
         private async void ToolsPortTesterButton_Click(object sender, EventArgs e)
@@ -3051,17 +4020,99 @@ namespace GelitaITToolkit.Forms
 
         private void SettingsReloadButton_Click(object sender, EventArgs e)
         {
-            // Stub: Será implementado na Fase 4
-            AddLog("Recarregamento de configurações - Não implementado", LogLevel.Info);
+            var statusTextBox = FindControl<RichTextBox>("SettingsStatusRichTextBox");
+            var errors = _configService.ValidateConfigurationFiles();
+            if (errors.Count > 0)
+            {
+                if (statusTextBox != null)
+                {
+                    statusTextBox.ForeColor = Color.Firebrick;
+                    statusTextBox.Text = "Configuração inválida:\n• " + string.Join("\n• ", errors);
+                }
+                AddLog($"Configurações não recarregadas: {string.Join(" | ", errors)}", LogLevel.Error);
+                MessageBox.Show(
+                    "As configurações possuem erros e não foram aplicadas.\n\n• " + string.Join("\n• ", errors),
+                    "Validar Configurações",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            try
+            {
+                LoadConfiguration();
+                RefreshInstallationStatuses();
+                if (statusTextBox != null)
+                {
+                    statusTextBox.ForeColor = Color.ForestGreen;
+                    statusTextBox.Text =
+                        $"✓ Configurações válidas\n" +
+                        $"✓ {_units.Count} unidade(s) carregada(s)\n" +
+                        $"✓ {_toolkitSettings.Programs.Count(program => program.Enabled)} programa(s) habilitado(s)\n" +
+                        $"✓ {_installerHashes.Hashes.Count} hash(es) SHA-256 validado(s)";
+                }
+                AddLog("Configurações validadas e recarregadas sem recompilar.", LogLevel.Info);
+                MessageBox.Show("Configurações validadas e recarregadas.", "Configurações", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha ao recarregar configurações: {ex.Message}", LogLevel.Error);
+                MessageBox.Show(ex.Message, "Configurações", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void SettingsOpenFolderButton_Click(object sender, EventArgs e)
         {
-            // Stub: Será implementado na Fase 4
-            AddLog("Abertura da pasta Config - Não implementado", LogLevel.Info);
+            var configDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = configDirectory,
+                    UseShellExecute = true
+                });
+                AddLog($"Pasta de configurações aberta: {configDirectory}.", LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Não foi possível abrir a pasta Config: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("Não foi possível abrir a pasta Config.", "Configurações", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // ==== ABA LOGS ====
+
+        private void LoadExecutionHistory(string? search = null)
+        {
+            if (_historyRichTextBox == null)
+                return;
+
+            try
+            {
+                if (!File.Exists(_historyFilePath))
+                {
+                    _historyRichTextBox.Text = "Nenhuma execução registrada.";
+                    return;
+                }
+
+                var lines = File.ReadLines(_historyFilePath);
+                if (!string.IsNullOrWhiteSpace(search))
+                    lines = lines.Where(line => line.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+                _historyRichTextBox.Text = string.Join(Environment.NewLine, lines.TakeLast(3000));
+                _historyRichTextBox.SelectionStart = _historyRichTextBox.TextLength;
+                _historyRichTextBox.ScrollToCaret();
+            }
+            catch (Exception ex)
+            {
+                _historyRichTextBox.Text = $"Não foi possível carregar o histórico: {ex.Message}";
+            }
+        }
+
+        private void HistorySearchTextBox_TextChanged(object? sender, EventArgs e)
+        {
+            LoadExecutionHistory((sender as TextBox)?.Text.Trim());
+        }
 
         private void LogsClearButton_Click(object sender, EventArgs e)
         {
