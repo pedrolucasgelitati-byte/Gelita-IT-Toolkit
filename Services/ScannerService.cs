@@ -78,19 +78,24 @@ namespace GelitaITToolkit.Services
 
             try
             {
-                if (!File.Exists(connectionFile))
-                {
-                    message = "O Epson Scan 2 ainda não possui uma configuração de conexão neste computador.";
-                    return false;
-                }
-
-                var contents = File.ReadAllText(connectionFile, Encoding.Unicode);
-                var root = JsonNode.Parse(contents);
+                Directory.CreateDirectory(Path.GetDirectoryName(connectionFile)!);
+                var contents = File.Exists(connectionFile)
+                    ? File.ReadAllText(connectionFile, Encoding.Unicode)
+                    : string.Empty;
+                var root = string.IsNullOrWhiteSpace(contents)
+                    ? new JsonObject { ["DeviceList"] = new JsonArray() }
+                    : JsonNode.Parse(contents);
                 var deviceList = (root as JsonObject)?["DeviceList"] as JsonArray;
                 if (deviceList == null)
                 {
-                    message = "Configuracao do Epson Scan 2 invalida.";
-                    return false;
+                    if (root is not JsonObject rootObject)
+                    {
+                        message = "Configuração do Epson Scan 2 inválida.";
+                        return false;
+                    }
+
+                    deviceList = new JsonArray();
+                    rootObject["DeviceList"] = deviceList;
                 }
 
                 var scannerGroups = NormalizeEpsonDeviceList(deviceList);
@@ -137,9 +142,15 @@ namespace GelitaITToolkit.Services
                 device["GUID"] = guid;
 
                 var json = root?.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) ?? contents;
+                if (File.Exists(connectionFile))
+                    File.Copy(connectionFile, connectionFile + ".toolkit.bak", overwrite: true);
                 File.WriteAllText(connectionFile, json, new UnicodeEncoding(false, true));
-                message = $"O scanner {scanner.Name} foi configurado no Epson Scan 2.";
-                return true;
+
+                var updatedProfiles = TryUpdateEpsonPreferencesForAllUsers(root, out var preferenceErrors);
+                message = $"O scanner {scanner.Name} foi configurado no Epson Scan 2 para {updatedProfiles} perfil(is) de usuário.";
+                if (preferenceErrors.Count > 0)
+                    message += $" Não foi possível atualizar: {string.Join("; ", preferenceErrors)}.";
+                return updatedProfiles > 0;
             }
             catch (UnauthorizedAccessException)
             {
@@ -151,6 +162,67 @@ namespace GelitaITToolkit.Services
                 message = $"Não foi possível atualizar o nome no Epson Scan 2: {ex.Message}";
                 return false;
             }
+        }
+
+        private static int TryUpdateEpsonPreferencesForAllUsers(
+            JsonNode? connectionRoot,
+            out List<string> errors)
+        {
+            errors = new List<string>();
+            var configuredDevices = FindAllEpsonDeviceReferences(connectionRoot)
+                .Where(device =>
+                    !string.IsNullOrWhiteSpace(device["scannerID"]?["string"]?.GetValue<string>()) &&
+                    !string.IsNullOrWhiteSpace(device["GUID"]?["string"]?.GetValue<string>()))
+                .ToList();
+            if (configuredDevices.Count == 0)
+                return 0;
+
+            var updated = 0;
+            foreach (var profileDirectory in UserProfileService.GetLocalProfileDirectories())
+            {
+                var profileName = Path.GetFileName(profileDirectory.TrimEnd(Path.DirectorySeparatorChar));
+                try
+                {
+                    var connectionDirectory = Path.Combine(
+                        profileDirectory,
+                        "AppData", "Roaming", "EPSON", "Epson Scan 2", "Connection");
+                    var preferredPath = Path.Combine(connectionDirectory, "PreferredInfo.dat");
+                    Directory.CreateDirectory(connectionDirectory);
+
+                    JsonObject preferences;
+                    if (File.Exists(preferredPath))
+                    {
+                        var existing = File.ReadAllText(preferredPath, Encoding.Unicode);
+                        preferences = JsonNode.Parse(existing) as JsonObject ?? new JsonObject();
+                        File.Copy(preferredPath, preferredPath + ".toolkit.bak", overwrite: true);
+                    }
+                    else
+                    {
+                        preferences = new JsonObject();
+                    }
+
+                    foreach (var device in configuredDevices)
+                    {
+                        var scannerId = device["scannerID"]!["string"]!.GetValue<string>();
+                        var guid = device["GUID"]!["string"]!.GetValue<string>();
+                        preferences[scannerId] = new JsonObject { ["string"] = guid };
+                    }
+
+                    var defaultScannerId = configuredDevices[0]["scannerID"]!["string"]!.GetValue<string>();
+                    preferences["_"] = new JsonObject { ["string"] = defaultScannerId };
+                    File.WriteAllText(
+                        preferredPath,
+                        preferences.ToJsonString(new JsonSerializerOptions { WriteIndented = true }),
+                        new UnicodeEncoding(false, true));
+                    updated++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{profileName}: {ex.Message}");
+                }
+            }
+
+            return updated;
         }
 
         /// <summary>Remove do Epson Scan 2 a conexão de rede correspondente ao IP informado.</summary>
