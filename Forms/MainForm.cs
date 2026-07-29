@@ -1789,7 +1789,7 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 1.0.0",
+                Text = "Versão: 1.0.1",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -2645,7 +2645,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 1.0.0\n\n" +
+                "Versão 1.0.1\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",
@@ -2926,6 +2926,7 @@ namespace GelitaITToolkit.Forms
             }
 
             var epsonService = new ScannerService();
+            var naps2Service = new Naps2ProfileService();
             var added = new List<string>();
             var failed = new List<string>();
 
@@ -2951,8 +2952,16 @@ namespace GelitaITToolkit.Forms
                     continue;
                 }
 
-                added.Add($"{printerName} ({ipAddress})");
                 AddLog(epsonMessage, LogLevel.Info);
+                if (!naps2Service.TryAddOrUpdateEpsonProfile(scanner, out var naps2Message))
+                {
+                    failed.Add($"{printerName}: Epson configurado, mas houve falha no NAPS2: {naps2Message}");
+                    AddLog(naps2Message, LogLevel.Warning);
+                    continue;
+                }
+
+                added.Add($"{printerName} ({ipAddress}) — Epson Scan 2 e NAPS2");
+                AddLog(naps2Message, LogLevel.Info);
             }
 
             if (added.Count > 0)
@@ -2962,7 +2971,7 @@ namespace GelitaITToolkit.Forms
             if (failed.Count > 0)
                 message += $"\n\nNão adicionados ({failed.Count}):\n{string.Join(Environment.NewLine, failed)}";
             if (added.Count > 0)
-                message += "\n\nAntes de usar no NAPS2, clique em “Validar Todos no Epson Scan 2”.";
+                message += "\n\nOs perfis foram aplicados aos usuários existentes e ao perfil padrão para novos usuários do AD.";
             MessageBox.Show(message, "Adicionar Scanners", MessageBoxButtons.OK, failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 

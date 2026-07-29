@@ -7,7 +7,7 @@ namespace GelitaITToolkit.Services
     using System.Xml.Linq;
     using GelitaITToolkit.Models;
 
-    /// <summary>Gerencia perfis TWAIN do NAPS2 no perfil do usuário atual.</summary>
+    /// <summary>Gerencia perfis TWAIN do NAPS2 nos perfis locais dos usuários.</summary>
     public class Naps2ProfileService
     {
         private static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
@@ -21,9 +21,30 @@ namespace GelitaITToolkit.Services
                 return false;
             }
 
-            var profilesDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "NAPS2");
+            var updatedProfiles = new List<string>();
+            var errors = new List<string>();
+            foreach (var profileDirectory in UserProfileService.GetLocalProfileDirectories())
+            {
+                var profileName = Path.GetFileName(profileDirectory.TrimEnd(Path.DirectorySeparatorChar));
+                var profilesDirectory = Path.Combine(profileDirectory, "AppData", "Roaming", "NAPS2");
+                if (TryAddOrUpdateEpsonProfileAtPath(scanner, deviceName, profilesDirectory, out var error))
+                    updatedProfiles.Add(profileName);
+                else
+                    errors.Add($"{profileName}: {error}");
+            }
+
+            message = $"Perfil “{GetProfileDisplayName(scanner.Name)}” atualizado no NAPS2 de {updatedProfiles.Count} perfil(is) de usuário.";
+            if (errors.Count > 0)
+                message += $" Falhas: {string.Join("; ", errors)}.";
+            return updatedProfiles.Count > 0;
+        }
+
+        private static bool TryAddOrUpdateEpsonProfileAtPath(
+            Scanner scanner,
+            string deviceName,
+            string profilesDirectory,
+            out string message)
+        {
             var profilesPath = Path.Combine(profilesDirectory, "profiles.xml");
             var temporaryPath = profilesPath + ".toolkit.tmp";
             var backupPath = profilesPath + ".toolkit.bak";
