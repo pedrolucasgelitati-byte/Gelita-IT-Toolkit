@@ -197,7 +197,31 @@ namespace GelitaITToolkit.Services
             ValidatePrintersConfiguration(errors);
             ValidateToolkitConfiguration(errors);
             ValidateHashesConfiguration(errors);
+            ValidateSecurityPolicy(errors);
             return errors;
+        }
+
+        private void ValidateSecurityPolicy(List<string> errors)
+        {
+            var path = Path.Combine(_configPath, "security-policy.json");
+            if (!File.Exists(path))
+            {
+                errors.Add("Config/security-policy.json não foi encontrado.");
+                return;
+            }
+
+            try
+            {
+                var policy = JsonSerializer.Deserialize<SecurityPolicy>(File.ReadAllText(path), _jsonOptions);
+                if (policy == null || policy.AllowedLocalAdministrators.Count == 0)
+                    errors.Add("security-policy.json deve possuir ao menos um administrador local permitido.");
+                else if (policy.AllowedLocalAdministrators.Any(string.IsNullOrWhiteSpace))
+                    errors.Add("security-policy.json possui um administrador permitido sem nome.");
+            }
+            catch (JsonException ex)
+            {
+                errors.Add($"security-policy.json inválido: {ex.Message}");
+            }
         }
 
         private void ValidatePrintersConfiguration(List<string> errors)

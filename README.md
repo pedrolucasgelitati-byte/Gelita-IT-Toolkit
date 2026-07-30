@@ -35,3 +35,13 @@ Não execute o programa diretamente de dentro do ZIP.
 ## Segurança
 
 O Toolkit valida os instaladores configurados antes da execução. Se um instalador for atualizado, seu hash em `Config/installer-hashes.json` também precisa ser atualizado.
+
+- Logs removem automaticamente senhas, tokens, chaves de API e segredos conhecidos.
+- A lista permitida de administradores locais fica em `Config/security-policy.json`.
+- Atualizações só são baixadas quando o Release possui um arquivo `.sha256` correspondente.
+- Depois da validação, o Toolkit fecha, cria um backup da versão atual, substitui todos os arquivos e abre novamente. Em caso de falha, a versão anterior é restaurada automaticamente.
+
+Como o repositório é privado, a consulta de atualizações pode usar um token
+somente de leitura fornecido pela variável de ambiente
+`GELITA_TOOLKIT_GITHUB_TOKEN`. O token nunca é salvo nem exibido nos logs. Não
+coloque tokens nos arquivos JSON.
