@@ -2,8 +2,8 @@
   "units": [
     {
       "name": "Maringá",
-      "printServer": "\\\\br-mga1-srv013v",
-      "printerIpRange": "10.55.44.0/24",
+      "printServer": "${GELITA_MARINGA_PRINT_SERVER}",
+      "printerIpRange": "${GELITA_MARINGA_PRINTER_NETWORK}",
       "scannerModels": {
         "MG_PRINTER_224": "Epson WF-M5899",
         "MG_PRINTER_225": "Epson WF-M5899",
@@ -44,8 +44,8 @@
     },
     {
       "name": "Cotia",
-      "printServer": "\\\\br-coa1-srv013v",
-      "printerIpRange": "10.55.12.42 - 10.55.12.63",
+      "printServer": "${GELITA_COTIA_PRINT_SERVER}",
+      "printerIpRange": "${GELITA_COTIA_PRINTER_NETWORK}",
       "scannerModels": {
         "CO_PRINTER_042": "Epson WF-C5899",
         "CO_PRINTER_043": "Epson WF-C5899",
@@ -81,8 +81,8 @@
     },
     {
       "name": "Mococa",
-      "printServer": "\\\\br-mco1-srv013v",
-      "printerIpRange": "10.55.103.130 - 10.55.103.156",
+      "printServer": "${GELITA_MOCOCA_PRINT_SERVER}",
+      "printerIpRange": "${GELITA_MOCOCA_PRINTER_NETWORK}",
       "scannerModels": {
         "MO_PRINTER_130": "Epson WF-M5899",
         "MO_PRINTER_133": "Epson WF-C5899",

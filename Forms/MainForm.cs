@@ -4,18 +4,20 @@ namespace GelitaITToolkit.Forms
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Drawing;
+    using System.Drawing.Text;
     using System.IO;
     using System.Linq;
     using System.Net;
     using System.Net.NetworkInformation;
     using System.Net.Sockets;
     using System.Runtime.InteropServices;
+    using System.Threading;
     using System.Threading.Tasks;
     using System.Windows.Forms;
     using GelitaITToolkit.Helpers;
-    using Microsoft.Win32;
     using GelitaITToolkit.Models;
     using GelitaITToolkit.Services;
+    using Microsoft.Win32;
 
     /// <summary>
     /// Formulário principal da aplicação Gelita IT Toolkit.
@@ -47,6 +49,7 @@ namespace GelitaITToolkit.Forms
         {
             public string Name { get; init; } = string.Empty;
             public string DiscoveryUrl { get; init; } = string.Empty;
+            public bool IsPrimary { get; init; }
 
             public override string ToString() => Name;
         }
@@ -108,7 +111,8 @@ namespace GelitaITToolkit.Forms
         /// RichTextBox para exibição de logs.
         /// </summary>
         private RichTextBox _logsRichTextBox;
-        private ComboBox _citrixStoresComboBox = null!;
+        private CheckedListBox _citrixStoresCheckedListBox = null!;
+        private bool _isConfiguringCitrix;
         private SplitContainer _navigationContainer = null!;
         private Panel _sideNavigation = null!;
         private Label _sideNavigationTitle = null!;
@@ -124,10 +128,20 @@ namespace GelitaITToolkit.Forms
             "GelitaITToolkit",
             "execution-history.log");
 
-        private static readonly Color GelitaNavy = Color.FromArgb(0, 59, 112);
-        private static readonly Color GelitaYellow = Color.FromArgb(245, 169, 0);
-        private static readonly Color GelitaLight = Color.FromArgb(247, 248, 250);
-        private static readonly Color GelitaBorder = Color.FromArgb(220, 226, 233);
+        // GELITA Content Style Guide
+        private static readonly Color GelitaNavy = ColorTranslator.FromHtml("#004279");
+        private static readonly Color GelitaOrange = ColorTranslator.FromHtml("#F7A600");
+        private static readonly Color GelitaMatterhorn = ColorTranslator.FromHtml("#575656");
+        private static readonly Color GelitaBlack = ColorTranslator.FromHtml("#0B0B0B");
+        private static readonly Color GelitaSnow = ColorTranslator.FromHtml("#FAFAFA");
+        private static readonly Color GelitaBorder = Color.FromArgb(196, 196, 196);
+        private static readonly PrivateFontCollection GelitaFonts = new();
+        private static FontFamily? _gelitaFontFamily;
+
+        // Mantém o nome antigo internamente para reduzir ruído nos componentes
+        // existentes; o valor agora é o laranja oficial do guia.
+        private static Color GelitaYellow => GelitaOrange;
+        private static Color GelitaLight => GelitaSnow;
 
         #endregion
 
@@ -158,10 +172,12 @@ namespace GelitaITToolkit.Forms
             this.MinimizeBox = true;
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.BackColor = GelitaLight;
+            LoadGelitaFonts();
+            this.Font = CreateGelitaFont(9f);
 
             // Criar componentes
             InitializeComponent();
-            ApplyReadableFontScale(this);
+            ApplyGelitaTypography(this);
         }
 
         private static Icon LoadApplicationIcon()
@@ -187,19 +203,41 @@ namespace GelitaITToolkit.Forms
             return File.Exists(fallbackIconPath) ? new Icon(fallbackIconPath) : SystemIcons.Application;
         }
 
-        private static void ApplyReadableFontScale(Control parent)
+        private static void LoadGelitaFonts()
+        {
+            if (_gelitaFontFamily != null)
+                return;
+
+            var fontsDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts");
+            foreach (var fontPath in new[]
+                     {
+                         Path.Combine(fontsDirectory, "Lato-Regular.ttf"),
+                         Path.Combine(fontsDirectory, "Lato-Bold.ttf")
+                     })
+            {
+                if (File.Exists(fontPath))
+                    GelitaFonts.AddFontFile(fontPath);
+            }
+
+            _gelitaFontFamily = GelitaFonts.Families.FirstOrDefault();
+        }
+
+        private static Font CreateGelitaFont(float size, FontStyle style = FontStyle.Regular) =>
+            _gelitaFontFamily != null
+                ? new Font(_gelitaFontFamily, size, style, GraphicsUnit.Point)
+                : new Font("Lato", size, style, GraphicsUnit.Point);
+
+        private static void ApplyGelitaTypography(Control parent)
         {
             foreach (Control control in parent.Controls)
             {
-                if (control.Font.SizeInPoints <= 10.1f)
-                {
-                    var family = control.Font.FontFamily;
-                    var style = control.Font.Style;
-                    control.Font = new Font(family, control.Font.SizeInPoints + 1f, style);
-                }
+                var size = control.Font.SizeInPoints <= 10.1f
+                    ? control.Font.SizeInPoints + 1f
+                    : control.Font.SizeInPoints;
+                control.Font = CreateGelitaFont(size, control.Font.Style);
 
                 if (control.HasChildren)
-                    ApplyReadableFontScale(control);
+                    ApplyGelitaTypography(control);
             }
         }
 
@@ -240,11 +278,11 @@ namespace GelitaITToolkit.Forms
 
             _sideNavigationTitle = new Label
             {
-                Text = "Gelita IT Tool Kit",
+                Text = "GELITA  IT TOOLKIT",
                 Location = new Point(6, 12),
                 Size = new Size(204, 32),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                Font = CreateGelitaFont(14, FontStyle.Bold),
                 ForeColor = GelitaYellow
             };
             _sideNavigation.Controls.Add(_sideNavigationTitle);
@@ -280,12 +318,16 @@ namespace GelitaITToolkit.Forms
                     Cursor = Cursors.Hand
                 };
                 button.FlatAppearance.BorderSize = 0;
-                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 76, 145);
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 82, 145);
+                button.FlatAppearance.MouseDownBackColor = GelitaOrange;
                 button.Click += SideNavigationButton_Click;
                 _sideNavigationButtons.Add(button);
                 _sideNavigation.Controls.Add(button);
                 top += 42;
             }
+
+            if (_sideNavigationButtons.Count > 0)
+                SetSelectedNavigationButton(_sideNavigationButtons[0]);
 
             _navigationContainer.Panel1.Controls.Add(_sideNavigation);
         }
@@ -296,7 +338,23 @@ namespace GelitaITToolkit.Forms
             {
                 var tab = _tabControl.TabPages.Cast<TabPage>().FirstOrDefault(page => page.Text == tabText);
                 if (tab != null)
+                {
                     _tabControl.SelectedTab = tab;
+                    SetSelectedNavigationButton((Button)sender);
+                }
+            }
+        }
+
+        private void SetSelectedNavigationButton(Button selectedButton)
+        {
+            foreach (var navigationButton in _sideNavigationButtons)
+            {
+                var isSelected = ReferenceEquals(navigationButton, selectedButton);
+                navigationButton.BackColor = isSelected ? GelitaOrange : GelitaNavy;
+                navigationButton.ForeColor = isSelected ? GelitaNavy : Color.White;
+                navigationButton.Font = CreateGelitaFont(
+                    navigationButton.Font.SizeInPoints,
+                    isSelected ? FontStyle.Bold : FontStyle.Regular);
             }
         }
 
@@ -338,7 +396,7 @@ namespace GelitaITToolkit.Forms
             _tabControl = new TabControl
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 9),
+                Font = CreateGelitaFont(9),
                 SizeMode = TabSizeMode.Fixed,
                 ItemSize = new Size(0, 1)
             };
@@ -371,13 +429,15 @@ namespace GelitaITToolkit.Forms
             _tabControl.TabPages.Add(CreateAboutTab());
 
             ConfigureResponsiveLayout();
-            this.Shown += (_, _) =>
+            this.Shown += async (_, _) =>
             {
                 // O SplitContainer ainda tem o tamanho padrão durante a construção;
                 // reaplica a largura quando a janela já possui suas dimensões reais.
                 _navigationContainer.SplitterDistance = 220;
                 UseAvailableTabSpace();
-                RefreshInstallationStatuses();
+                await Task.WhenAll(
+                    LoadDashboardHardwareAsync(),
+                    RefreshInstallationStatusesAsync());
             };
             ApplyVisualStyle(_tabControl);
 
@@ -420,7 +480,14 @@ namespace GelitaITToolkit.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            var hardware = GetHardwareInfo();
+            var hardware = new HardwareInfo
+            {
+                Processor = "Carregando...",
+                TotalMemory = "Carregando...",
+                MemoryType = "Carregando...",
+                MemorySpeed = "Carregando...",
+                ServiceTag = "Carregando..."
+            };
             var operatingSystem = GetOperatingSystemInfo();
 
             // Nome do Computador
@@ -1252,7 +1319,7 @@ namespace GelitaITToolkit.Forms
 
             var storeGroup = new GroupBox
             {
-                Text = "Adicionar loja ao Citrix Workspace",
+                Text = "Configurar contas do Citrix Workspace",
                 Location = new Point(10, 10),
                 Size = new Size(950, 300),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
@@ -1261,7 +1328,7 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "Selecione a loja que deve ser adicionada ao Citrix Workspace deste computador.",
+                Text = "Marque somente as contas necessárias para o usuário. CitrixBR vem selecionada por padrão.",
                 Location = new Point(20, 35),
                 Size = new Size(780, 28),
                 Font = new Font("Segoe UI", 9)
@@ -1269,39 +1336,42 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "Loja:",
+                Text = "Contas:",
                 Location = new Point(20, 82),
                 Size = new Size(100, 28),
                 Font = new Font("Segoe UI", 9)
             });
 
-            _citrixStoresComboBox = new ComboBox
+            _citrixStoresCheckedListBox = new CheckedListBox
             {
-                Name = "CitrixStoresComboBox",
+                Name = "CitrixStoresCheckedListBox",
                 Location = new Point(125, 78),
-                Size = new Size(380, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
+                Size = new Size(380, 66),
+                CheckOnClick = true,
+                BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 9)
             };
-            _citrixStoresComboBox.Items.AddRange(new object[]
+            _citrixStoresCheckedListBox.Items.AddRange(new object[]
             {
                 new CitrixStoreOption
                 {
-                    Name = "Gelita Europa",
-                    DiscoveryUrl = "https://citrixeb.eu.gelita.local"
+                    Name = "CitrixBRInternal",
+                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_BR_DISCOVERY_URL"),
+                    IsPrimary = true
                 },
                 new CitrixStoreOption
                 {
-                    Name = "Gelita Brasil - Interno",
-                    DiscoveryUrl = "https://sf.gelitausa.com/Citrix/CitrixBRInternal/discovery"
+                    Name = "CitrixEB",
+                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_EB_DISCOVERY_URL")
                 }
             });
-            storeGroup.Controls.Add(_citrixStoresComboBox);
+            _citrixStoresCheckedListBox.SetItemChecked(0, true);
+            storeGroup.Controls.Add(_citrixStoresCheckedListBox);
 
             storeGroup.Controls.Add(new Label
             {
                 Text = "EndereÃ§o:",
-                Location = new Point(20, 128),
+                Location = new Point(20, 155),
                 Size = new Size(100, 28),
                 Font = new Font("Segoe UI", 9)
             });
@@ -1309,21 +1379,27 @@ namespace GelitaITToolkit.Forms
             var storeUrlTextBox = new TextBox
             {
                 Name = "CitrixStoreUrlTextBox",
-                Location = new Point(125, 124),
+                Location = new Point(125, 151),
                 Size = new Size(700, 28),
                 ReadOnly = true,
                 Font = new Font("Segoe UI", 9),
                 BackColor = Color.White
             };
             storeGroup.Controls.Add(storeUrlTextBox);
-            _citrixStoresComboBox.SelectedIndexChanged += (_, _) =>
-                storeUrlTextBox.Text = (_citrixStoresComboBox.SelectedItem as CitrixStoreOption)?.DiscoveryUrl ?? string.Empty;
-            _citrixStoresComboBox.SelectedIndex = 0;
+            void UpdateSelectedCitrixUrls() =>
+                storeUrlTextBox.Text = string.Join(
+                    " | ",
+                    _citrixStoresCheckedListBox.CheckedItems
+                        .OfType<CitrixStoreOption>()
+                        .Select(store => $"{store.Name}: {store.DiscoveryUrl}"));
+            _citrixStoresCheckedListBox.ItemCheck += (_, _) =>
+                BeginInvoke((Action)UpdateSelectedCitrixUrls);
+            UpdateSelectedCitrixUrls();
 
             var addStoreButton = new Button
             {
-                Text = "+ Adicionar Loja Selecionada",
-                Location = new Point(125, 185),
+                Text = "Aplicar contas selecionadas",
+                Location = new Point(125, 198),
                 Size = new Size(230, 40),
                 BackColor = GelitaNavy,
                 ForeColor = Color.White,
@@ -1336,7 +1412,7 @@ namespace GelitaITToolkit.Forms
             var openWorkspaceButton = new Button
             {
                 Text = "Abrir Citrix Workspace",
-                Location = new Point(370, 185),
+                Location = new Point(370, 198),
                 Size = new Size(200, 40),
                 BackColor = GelitaYellow,
                 ForeColor = GelitaNavy,
@@ -1348,8 +1424,8 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "O Citrix Workspace deve estar instalado. A tela de login pode ser exibida pelo Citrix apÃ³s a inclusÃ£o da loja.",
-                Location = new Point(20, 245),
+                Text = "As contas desmarcadas que são gerenciadas pelo Toolkit serão removidas. O Citrix pode solicitar autenticação.",
+                Location = new Point(20, 252),
                 Size = new Size(850, 30),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.DimGray
@@ -1365,142 +1441,208 @@ namespace GelitaITToolkit.Forms
             {
                 Text = "Ferramentas",
                 Name = "ToolsTab",
-                Padding = new Padding(10)
+                Padding = new Padding(12),
+                BackColor = Color.FromArgb(245, 247, 250)
             };
 
-            // Painel de Ferramentas
-            var toolsPanel = new GroupBox
+            var headerPanel = new Panel
             {
-                Text = "Ferramentas Disponíveis",
-                Location = new Point(10, 10),
-                Size = new Size(950, 500),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+                Dock = DockStyle.Top,
+                Height = 72,
+                Padding = new Padding(8, 5, 8, 8),
+                BackColor = Color.White
             };
-
-            var flowPanel = new FlowLayoutPanel
+            headerPanel.Controls.Add(new Label
             {
-                Location = new Point(20, 30),
-                Size = new Size(910, 450),
-                FlowDirection = FlowDirection.TopDown,
+                Text = "Central de Ferramentas",
+                Location = new Point(12, 8),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                ForeColor = GelitaNavy
+            });
+            headerPanel.Controls.Add(new Label
+            {
+                Text = "Administração, diagnóstico e reparos organizados por categoria.",
+                Location = new Point(15, 40),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.DimGray
+            });
+
+            var cardsViewport = new Panel
+            {
+                Dock = DockStyle.Fill,
                 AutoScroll = true,
-                Padding = new Padding(0)
+                Padding = new Padding(12),
+                BackColor = Color.FromArgb(245, 247, 250)
             };
 
-            // Botão Gerenciador de Impressoras
-            flowPanel.Controls.Add(CreateToolsCategoryLabel("Administração do Windows"));
-
-            var printerMgmtButton = new Button
+            var cardsGrid = new TableLayoutPanel
             {
-                Text = "Abrir Gerenciador de Impressoras",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
+                Location = new Point(12, 12),
+                ColumnCount = 3,
+                RowCount = 1,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                BackColor = Color.Transparent
             };
-            printerMgmtButton.Click += ToolsPrinterMgmtButton_Click;
-            flowPanel.Controls.Add(printerMgmtButton);
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
+            cardsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            // Botão Gerenciador de Dispositivos
-            var deviceMgmtButton = new Button
+            var toolColumns = Enumerable.Range(0, 3)
+                .Select(_ => new FlowLayoutPanel
+                {
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoSize = false,
+                    Margin = Padding.Empty,
+                    Padding = Padding.Empty,
+                    BackColor = Color.Transparent
+                })
+                .ToArray();
+            for (var columnIndex = 0; columnIndex < toolColumns.Length; columnIndex++)
+                cardsGrid.Controls.Add(toolColumns[columnIndex], columnIndex, 0);
+
+            toolColumns[0].Controls.Add(CreateToolsCategoryCard(
+                "Administração do Windows",
+                "Acessos rápidos aos consoles administrativos.",
+                ("Gerenciador de Impressoras", ToolsPrinterMgmtButton_Click),
+                ("Gerenciador de Dispositivos", ToolsDeviceMgmtButton_Click)));
+
+            toolColumns[1].Controls.Add(CreateToolsCategoryCard(
+                "Impressão e conectividade",
+                "Filas, portas, scanners e comunicação com equipamentos.",
+                ("Limpar Spool de Impressão", ToolsSpoolCleanButton_Click),
+                ("Reiniciar Serviço de Impressão", ToolsRestartSpoolerButton_Click),
+                ("Testador de Porta", ToolsPortTesterButton_Click),
+                ("Corrigir Filas Offline", ToolsRepairOfflinePrintersButton_Click),
+                ("Teste Real de Digitalização", ToolsRealScanTestButton_Click)));
+
+            toolColumns[2].Controls.Add(CreateToolsCategoryCard(
+                "Rede e Windows Update",
+                "Correções de rede e manutenção do sistema operacional.",
+                ("Renovar IP e Limpar DNS", ToolsRenewIpAndDnsButton_Click),
+                ("Redefinir Winsock", ToolsResetWinsockButton_Click),
+                ("Reiniciar Serviços de Rede", ToolsRestartNetworkServicesButton_Click),
+                ("Reparar Windows Update", ToolsRepairWindowsUpdateButton_Click),
+                ("Atualizar Tudo — winget", ToolsWingetUpdateAllButton_Click),
+                ("Atualizar Windows 11 para 25H2", ToolsWindows25H2Button_Click)));
+
+            toolColumns[0].Controls.Add(CreateToolsCategoryCard(
+                "Integridade do Windows",
+                "Limpeza, verificação e reparo dos componentes do Windows.",
+                ("Abrir Limpeza de Disco", ToolsDiskCleanupButton_Click),
+                ("Limpar Arquivos Temporários", ToolsCleanTemporaryFilesButton_Click),
+                ("SFC /scannow", ToolsSfcButton_Click),
+                ("DISM ScanHealth", ToolsDismScanButton_Click),
+                ("DISM RestoreHealth", ToolsDismRestoreButton_Click),
+                ("CHKDSK Online", ToolsChkdskScanButton_Click),
+                ("CHKDSK ao Reiniciar", ToolsChkdskRepairButton_Click)));
+
+            toolColumns[1].Controls.Add(CreateToolsCategoryCard(
+                "Segurança e manutenção",
+                "Conformidade, backup e atualização segura do Toolkit.",
+                ("Verificar Segurança do Computador", ToolsSecurityStatusButton_Click),
+                ("Criar Backup do Toolkit", ToolsCreateBackupButton_Click),
+                ("Verificar Atualização do Toolkit", ToolsCheckUpdateButton_Click)));
+
+            void ArrangeToolCards()
             {
-                Text = "Abrir Gerenciador de Dispositivos",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            deviceMgmtButton.Click += ToolsDeviceMgmtButton_Click;
-            flowPanel.Controls.Add(deviceMgmtButton);
+                var viewportWidth = Math.Max(780, cardsViewport.ClientSize.Width - cardsViewport.Padding.Horizontal);
+                var columnWidth = viewportWidth / 3;
+                var columnHeights = new int[toolColumns.Length];
 
-            // Botão Limpeza de Spool
-            flowPanel.Controls.Add(CreateToolsCategoryLabel("Impressão e conectividade"));
+                for (var columnIndex = 0; columnIndex < toolColumns.Length; columnIndex++)
+                {
+                    var column = toolColumns[columnIndex];
+                    column.Width = columnWidth;
+                    foreach (Control card in column.Controls)
+                        card.Width = Math.Max(250, columnWidth - card.Margin.Horizontal);
 
-            var spoolCleanButton = new Button
-            {
-                Text = "Limpar Spool de Impressão",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            spoolCleanButton.Click += ToolsSpoolCleanButton_Click;
-            flowPanel.Controls.Add(spoolCleanButton);
+                    columnHeights[columnIndex] = column.Controls
+                        .Cast<Control>()
+                        .Sum(card => card.Height + card.Margin.Vertical);
+                    column.Height = columnHeights[columnIndex];
+                }
 
-            // Botão Reiniciar Serviço de Impressão
-            var restartSpoolerButton = new Button
-            {
-                Text = "Reiniciar Serviço de Impressão",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            restartSpoolerButton.Click += ToolsRestartSpoolerButton_Click;
-            flowPanel.Controls.Add(restartSpoolerButton);
+                cardsGrid.Width = viewportWidth;
+                cardsGrid.Height = columnHeights.Max();
+            }
 
-            // Botão Testador de Porta
-            var portTesterButton = new Button
-            {
-                Text = "Testador de Porta e Conectividade",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            portTesterButton.Click += ToolsPortTesterButton_Click;
-            flowPanel.Controls.Add(portTesterButton);
-
-            flowPanel.Controls.Add(CreateToolsCategoryLabel("Central de Reparos"));
-
-            var diskCleanupButton = new Button
-            {
-                Text = "Abrir Limpeza de Disco",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            diskCleanupButton.Click += ToolsDiskCleanupButton_Click;
-            flowPanel.Controls.Add(diskCleanupButton);
-
-            flowPanel.Controls.Add(CreateSystemCommandButton("Limpar Arquivos Temporários", ToolsCleanTemporaryFilesButton_Click));
-            flowPanel.Controls.Add(CreateSystemCommandButton("Renovar IP e Limpar DNS", ToolsRenewIpAndDnsButton_Click));
-            flowPanel.Controls.Add(CreateSystemCommandButton("Redefinir Winsock", ToolsResetWinsockButton_Click));
-            flowPanel.Controls.Add(CreateSystemCommandButton("Reiniciar Serviços de Rede", ToolsRestartNetworkServicesButton_Click));
-            flowPanel.Controls.Add(CreateSystemCommandButton("Reparar Windows Update", ToolsRepairWindowsUpdateButton_Click));
-
-            var sfcButton = CreateSystemCommandButton("Verificar Windows — SFC /scannow", ToolsSfcButton_Click);
-            flowPanel.Controls.Add(sfcButton);
-
-            var dismScanButton = CreateSystemCommandButton("Verificar imagem — DISM ScanHealth", ToolsDismScanButton_Click);
-            flowPanel.Controls.Add(dismScanButton);
-
-            var dismRestoreButton = CreateSystemCommandButton("Reparar imagem — DISM RestoreHealth", ToolsDismRestoreButton_Click);
-            flowPanel.Controls.Add(dismRestoreButton);
-
-            var chkdskScanButton = CreateSystemCommandButton("Verificar disco — CHKDSK online", ToolsChkdskScanButton_Click);
-            flowPanel.Controls.Add(chkdskScanButton);
-
-            var chkdskRepairButton = CreateSystemCommandButton("Reparar disco — CHKDSK ao reiniciar", ToolsChkdskRepairButton_Click);
-            flowPanel.Controls.Add(chkdskRepairButton);
-
-            flowPanel.Controls.Add(CreateSystemCommandButton("Atualizar Tudo — winget", ToolsWingetUpdateAllButton_Click));
-
-            toolsPanel.Controls.Add(flowPanel);
-            tabPage.Controls.Add(toolsPanel);
+            cardsViewport.Controls.Add(cardsGrid);
+            cardsViewport.Resize += (_, _) => ArrangeToolCards();
+            tabPage.Enter += (_, _) => ArrangeToolCards();
+            tabPage.Controls.Add(cardsViewport);
+            tabPage.Controls.Add(headerPanel);
             return tabPage;
+        }
+
+        private static Panel CreateToolsCategoryCard(
+            string title,
+            string description,
+            params (string Text, EventHandler Handler)[] actions)
+        {
+            const int cardWidth = 330;
+            var cardHeight = 92 + actions.Length * 46;
+            var card = new Panel
+            {
+                Width = cardWidth,
+                Height = cardHeight,
+                BackColor = Color.White,
+                Margin = new Padding(8, 8, 8, 12),
+                Padding = new Padding(14),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            card.Controls.Add(new Label
+            {
+                Text = title,
+                Location = new Point(14, 12),
+                Size = new Size(cardWidth - 30, 24),
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = GelitaNavy
+            });
+            card.Controls.Add(new Label
+            {
+                Text = description,
+                Location = new Point(14, 38),
+                Size = new Size(cardWidth - 30, 38),
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.DimGray
+            });
+
+            var top = 80;
+            foreach (var action in actions)
+            {
+                var button = new Button
+                {
+                    Text = action.Text,
+                    Location = new Point(14, top),
+                    Size = new Size(cardWidth - 30, 38),
+                    Font = new Font("Segoe UI", 9),
+                    BackColor = GelitaNavy,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                button.FlatAppearance.BorderSize = 0;
+                button.Click += action.Handler;
+                card.Controls.Add(button);
+                top += 46;
+            }
+
+            void ResizeCardContents()
+            {
+                var contentWidth = Math.Max(180, card.ClientSize.Width - 28);
+                foreach (Control child in card.Controls)
+                    child.Width = contentWidth;
+            }
+
+            card.Resize += (_, _) => ResizeCardContents();
+            ResizeCardContents();
+            return card;
         }
 
         private static Button CreateSystemCommandButton(string text, EventHandler clickHandler)
@@ -1789,7 +1931,7 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 1.0.1",
+                Text = "Versão: 1.0.3",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -1883,11 +2025,11 @@ namespace GelitaITToolkit.Forms
         /// Evento acionado quando o formulário é carregado.
         /// Carrega as unidades e scanners do arquivo de configuração.
         /// </summary>
-        private void MainForm_Load(object sender, EventArgs e)
+        private async void MainForm_Load(object sender, EventArgs e)
         {
             try
             {
-                LoadConfiguration();
+                await LoadConfigurationAsync();
                 UpdateStatusLabel("Aplicação inicializada com sucesso");
                 AddLog("Interface carregada - Sistema pronto", LogLevel.Info);
             }
@@ -1919,7 +2061,7 @@ namespace GelitaITToolkit.Forms
         /// Carrega as unidades e scanners do arquivo de configuração.
         /// Popula os ComboBoxes e ListBoxes das abas correspondentes.
         /// </summary>
-        private void LoadConfiguration()
+        private async Task LoadConfigurationAsync()
         {
             try
             {
@@ -1957,7 +2099,8 @@ namespace GelitaITToolkit.Forms
                 }
 
                 // A lista é específica da máquina atual e vem do Epson Scan 2.
-                var scanners = new ScannerService().GetConfiguredEpsonScanners();
+                var scanners = await Task.Run(
+                    () => new ScannerService().GetConfiguredEpsonScanners());
                 PopulateScannersList(scanners);
                 if (scanners.Count > 0)
                 {
@@ -2055,13 +2198,31 @@ namespace GelitaITToolkit.Forms
             if (!int.TryParse(numberPart, out var printerNumber))
                 return null;
 
-            return unit.PrinterIpRange switch
+            var range = unit.PrinterIpRange.Trim();
+            var firstAddress = range
+                .Split(new[] { '/', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(firstAddress))
+                return null;
+
+            var octets = firstAddress.Split('.');
+            if (octets.Length != 4 ||
+                !octets.Take(3).All(octet => byte.TryParse(octet, out _)) ||
+                printerNumber is < 1 or > 254)
+                return null;
+
+            if (range.Contains('-', StringComparison.Ordinal))
             {
-                "10.55.44.0/24" => $"10.55.44.{printerNumber}",
-                "10.55.12.42 - 10.55.12.63" when printerNumber is >= 42 and <= 63 => $"10.55.12.{printerNumber}",
-                "10.55.103.130 - 10.55.103.156" when printerNumber is >= 130 and <= 156 => $"10.55.103.{printerNumber}",
-                _ => null
-            };
+                var addresses = range.Split('-', StringSplitOptions.TrimEntries);
+                if (addresses.Length != 2 ||
+                    !int.TryParse(addresses[0].Split('.').LastOrDefault(), out var start) ||
+                    !int.TryParse(addresses[1].Split('.').LastOrDefault(), out var end) ||
+                    printerNumber < start ||
+                    printerNumber > end)
+                    return null;
+            }
+
+            return $"{octets[0]}.{octets[1]}.{octets[2]}.{printerNumber}";
         }
 
         #endregion
@@ -2174,10 +2335,16 @@ namespace GelitaITToolkit.Forms
                 button.FlatAppearance.BorderSize = 1;
                 button.FlatAppearance.BorderColor = GelitaBorder;
                 button.FlatAppearance.MouseOverBackColor = button.BackColor == GelitaYellow
-                    ? Color.FromArgb(255, 193, 42)
-                    : button.BackColor == GelitaNavy ? Color.FromArgb(0, 76, 145) : Color.White;
+                    ? Color.FromArgb(255, 188, 46)
+                    : button.BackColor == GelitaNavy ? Color.FromArgb(0, 82, 145) : GelitaSnow;
                 button.Cursor = Cursors.Hand;
             }
+
+            if (control is Label label && label.ForeColor == SystemColors.ControlText)
+                label.ForeColor = GelitaMatterhorn;
+
+            if (control is CheckBox checkBox && checkBox.ForeColor == SystemColors.ControlText)
+                checkBox.ForeColor = GelitaBlack;
 
             foreach (Control child in control.Controls)
                 ApplyVisualStyle(child);
@@ -2361,6 +2528,23 @@ namespace GelitaITToolkit.Forms
                 MemorySpeed = memorySpeed,
                 ServiceTag = string.IsNullOrWhiteSpace(serviceTag) ? "Não identificado" : serviceTag.Trim()
             };
+        }
+
+        private async Task LoadDashboardHardwareAsync()
+        {
+            var hardware = await Task.Run(GetHardwareInfo);
+            SetReadOnlyText("ProcessorTextBox", hardware.Processor);
+            SetReadOnlyText("TotalMemoryTextBox", hardware.TotalMemory);
+            SetReadOnlyText("MemoryTypeTextBox", hardware.MemoryType);
+            SetReadOnlyText("MemorySpeedTextBox", hardware.MemorySpeed);
+            SetReadOnlyText("ServiceTagTextBox", hardware.ServiceTag);
+        }
+
+        private void SetReadOnlyText(string controlName, string value)
+        {
+            var textBox = FindControl<TextBox>(controlName);
+            if (textBox != null)
+                textBox.Text = value;
         }
 
         private static string GetMemoryTypeName(ushort memoryType)
@@ -2560,11 +2744,21 @@ namespace GelitaITToolkit.Forms
                 return;
 
             var printers = await _printerService.GetPrintersByUnit(unit);
-            printersList.Items.Clear();
-            foreach (var printer in printers)
+            var installedPrinterNames = await Task.Run(_printerService.GetInstalledPrinterNames);
+
+            printersList.BeginUpdate();
+            try
             {
-                printer.IsInstalled = _printerService.IsPrinterInstalled(printer.Name);
-                printersList.Items.Add(printer, false);
+                printersList.Items.Clear();
+                foreach (var printer in printers)
+                {
+                    printer.IsInstalled = _printerService.IsPrinterInstalled(printer.Name, installedPrinterNames);
+                    printersList.Items.Add(printer, false);
+                }
+            }
+            finally
+            {
+                printersList.EndUpdate();
             }
 
             AddLog($"{printers.Count} impressora(s) carregada(s) para {unit.Name}.", LogLevel.Info);
@@ -2596,6 +2790,7 @@ namespace GelitaITToolkit.Forms
         {
             try
             {
+                message = LogSanitizer.Sanitize(message);
                 string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 string logEntry = $"[{timestamp}] [{level}] {message}\n";
 
@@ -2645,7 +2840,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 1.0.1\n\n" +
+                "Versão 1.0.3\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",
@@ -2960,8 +3155,25 @@ namespace GelitaITToolkit.Forms
                     continue;
                 }
 
-                added.Add($"{printerName} ({ipAddress}) — Epson Scan 2 e NAPS2");
                 AddLog(naps2Message, LogLevel.Info);
+                var validationFailures = new ScannerValidationService()
+                    .Validate(scanner)
+                    .Where(result => !result.Success)
+                    .Select(result => $"{result.Item}: {result.Details}")
+                    .ToList();
+                if (validationFailures.Count > 0)
+                {
+                    failed.Add(
+                        $"{printerName}: configuração gravada, mas a confirmação automática falhou em " +
+                        string.Join("; ", validationFailures));
+                    AddLog(
+                        $"Scanner {printerName} requer revisão: {string.Join("; ", validationFailures)}",
+                        LogLevel.Warning);
+                    continue;
+                }
+
+                added.Add($"{printerName} ({ipAddress}) — confirmado no Epson Scan 2 e NAPS2");
+                AddLog($"Scanner {printerName} confirmado automaticamente no Epson Scan 2 e NAPS2.", LogLevel.Info);
             }
 
             if (added.Count > 0)
@@ -3265,17 +3477,20 @@ namespace GelitaITToolkit.Forms
             InstallationsInstallButton_Click(sender, e);
         }
 
-        private void RefreshInstallationStatuses()
+        private async Task RefreshInstallationStatusesAsync()
         {
+            var installedSoftware = await Task.Run(GetInstalledSoftwareNames);
+
             SetInstallationStatus("Epson", "InstallEpsonScanStatusLabel",
-                IsSoftwareInstalled("Epson Scan 2") ||
+                IsSoftwareInstalled(installedSoftware, "Epson Scan 2") ||
                 Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "EPSON", "Epson Scan 2")));
-            SetInstallationStatus("NAPS2", "InstallNapsStatusLabel", IsSoftwareInstalled("NAPS2"));
-            SetInstallationStatus("Sentinel", "InstallSentinelOneStatusLabel", IsSoftwareInstalled("Sentinel"));
+            SetInstallationStatus("NAPS2", "InstallNapsStatusLabel", IsSoftwareInstalled(installedSoftware, "NAPS2"));
+            SetInstallationStatus("Sentinel", "InstallSentinelOneStatusLabel", IsSoftwareInstalled(installedSoftware, "Sentinel"));
             SetInstallationStatus("Office", "InstallOfficeStatusLabel",
-                IsSoftwareInstalled("Microsoft 365") || IsSoftwareInstalled("Microsoft Office"));
+                IsSoftwareInstalled(installedSoftware, "Microsoft 365") ||
+                IsSoftwareInstalled(installedSoftware, "Microsoft Office"));
             SetInstallationStatus("GlobalProtect", "InstallPaloAltoStatusLabel",
-                IsSoftwareInstalled("GlobalProtect"));
+                IsSoftwareInstalled(installedSoftware, "GlobalProtect"));
         }
 
         private void SetInstallationStatus(string softwareKey, string labelName, bool installed)
@@ -3296,8 +3511,15 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private static bool IsSoftwareInstalled(string displayNameFragment)
+        private static bool IsSoftwareInstalled(
+            IReadOnlyCollection<string> installedSoftware,
+            string displayNameFragment) =>
+            installedSoftware.Any(applicationName =>
+                applicationName.Contains(displayNameFragment, StringComparison.OrdinalIgnoreCase));
+
+        private static IReadOnlyCollection<string> GetInstalledSoftwareNames()
         {
+            var installedSoftware = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var registryPaths = new[]
             {
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
@@ -3318,8 +3540,8 @@ namespace GelitaITToolkit.Forms
                         {
                             using var applicationKey = uninstallKey.OpenSubKey(subKeyName);
                             var applicationName = applicationKey?.GetValue("DisplayName")?.ToString();
-                            if (applicationName?.Contains(displayNameFragment, StringComparison.OrdinalIgnoreCase) == true)
-                                return true;
+                            if (!string.IsNullOrWhiteSpace(applicationName))
+                                installedSoftware.Add(applicationName);
                         }
                     }
                     catch
@@ -3329,7 +3551,7 @@ namespace GelitaITToolkit.Forms
                 }
             }
 
-            return false;
+            return installedSoftware;
         }
 
         private async void InstallationsInstallButton_Click(object? sender, EventArgs e)
@@ -3358,7 +3580,7 @@ namespace GelitaITToolkit.Forms
                     installButton.Enabled = true;
                 if (executeAllButton != null)
                     executeAllButton.Enabled = true;
-                RefreshInstallationStatuses();
+                await RefreshInstallationStatusesAsync();
             }
         }
 
@@ -3624,38 +3846,257 @@ namespace GelitaITToolkit.Forms
 
         private async void CitrixAddStoreButton_Click(object? sender, EventArgs e)
         {
-            if (_citrixStoresComboBox.SelectedItem is not CitrixStoreOption store)
-            {
-                MessageBox.Show("Selecione uma loja Citrix.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (_isConfiguringCitrix)
                 return;
-            }
 
+            _isConfiguringCitrix = true;
+            if (sender is Button button)
+                button.Enabled = false;
+
+            try
+            {
+                await ConfigureSelectedCitrixStoresAsync();
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha inesperada ao configurar o Citrix: {ex.Message}", LogLevel.Error);
+                UpdateStatusLabel("Falha ao configurar as contas Citrix.");
+                MessageBox.Show(
+                    $"Não foi possível configurar as contas Citrix:\n\n{ex.Message}",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _isConfiguringCitrix = false;
+                if (sender is Button completedButton && !completedButton.IsDisposed)
+                    completedButton.Enabled = true;
+            }
+        }
+
+        private async Task ConfigureSelectedCitrixStoresAsync()
+        {
             var selfServicePath = FindCitrixSelfServiceExecutable();
+            var storeBrowsePath = FindCitrixStoreBrowseExecutable();
             if (selfServicePath == null)
             {
-                AddLog("Citrix Workspace nÃ£o encontrado para adicionar a loja.", LogLevel.Warning);
-                MessageBox.Show("O Citrix Workspace nÃ£o foi encontrado neste computador. Instale-o antes de adicionar uma loja.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AddLog("Citrix Workspace ou Storebrowse não encontrado.", LogLevel.Warning);
+                MessageBox.Show(
+                    "O Citrix Workspace não foi encontrado por completo neste computador. Repare ou reinstale o aplicativo antes de configurar as contas.",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
-            var configured = await RunProcessAsync(
-                selfServicePath,
-                $"storebrowse -a \"{store.DiscoveryUrl}\"",
-                Path.GetDirectoryName(selfServicePath));
+            var managedStores = _citrixStoresCheckedListBox.Items
+                .OfType<CitrixStoreOption>()
+                .ToArray();
+            var selectedStores = _citrixStoresCheckedListBox.CheckedItems
+                .OfType<CitrixStoreOption>()
+                .ToArray();
+            if (selectedStores.Length == 0)
+            {
+                MessageBox.Show(
+                    "Marque CitrixBR, CitrixEB ou as duas contas.",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
 
-            AddLog(configured
-                ? $"Loja Citrix adicionada: {store.Name} ({store.DiscoveryUrl})."
-                : $"Falha ao adicionar a loja Citrix: {store.Name}.",
-                configured ? LogLevel.Info : LogLevel.Error);
+            var selfServiceWorkingDirectory = Path.GetDirectoryName(selfServicePath);
+            var removalTimeout = TimeSpan.FromSeconds(8);
+            var additionTimeout = TimeSpan.FromSeconds(30);
+
+            UpdateStatusLabel($"Configurando {string.Join(" e ", selectedStores.Select(store => store.Name))}...");
+
+            // Remove registros invisíveis criados por versões que usavam o
+            // Storebrowse independente em vez do cadastro do Self-Service.
+            if (storeBrowsePath != null)
+            {
+                var storeBrowseWorkingDirectory = Path.GetDirectoryName(storeBrowsePath);
+                foreach (var store in managedStores)
+                {
+                    foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
+                    {
+                        await RunProcessAsync(
+                            storeBrowsePath,
+                            $"-d \"{storeUrl}\"",
+                            storeBrowseWorkingDirectory,
+                            removalTimeout);
+                    }
+                }
+            }
+
+            // Remove somente as contas gerenciadas pelo Toolkit. Depois adiciona
+            // apenas as marcadas; quando ambas são escolhidas, CitrixBR vem primeiro.
+            for (var storeIndex = managedStores.Length - 1; storeIndex >= 0; storeIndex--)
+            {
+                var store = managedStores[storeIndex];
+                foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
+                {
+                    await RunProcessAsync(
+                        selfServicePath,
+                        $"storebrowse -d \"{storeUrl}\"",
+                        selfServiceWorkingDirectory,
+                        removalTimeout);
+                }
+            }
+
+            var configuredStores = new List<string>();
+            foreach (var store in selectedStores)
+            {
+                var added = await RunProcessAsync(
+                    selfServicePath,
+                    $"storebrowse -a \"{store.DiscoveryUrl}\"",
+                    selfServiceWorkingDirectory,
+                    additionTimeout);
+
+                AddLog(
+                    added
+                        ? $"Conta Citrix adicionada: {store.Name}{(store.IsPrimary ? " (principal)" : string.Empty)}."
+                        : $"Falha ao adicionar a conta Citrix: {store.Name}.",
+                    added ? LogLevel.Info : LogLevel.Error);
+
+                if (added)
+                    configuredStores.Add(store.Name);
+            }
+
+            var friendlyNamesApplied = configuredStores.Count == selectedStores.Length &&
+                await ApplyCitrixFriendlyNamesAsync(selectedStores);
+            var configured =
+                configuredStores.Count == selectedStores.Length &&
+                friendlyNamesApplied;
+            if (!friendlyNamesApplied && configuredStores.Count == selectedStores.Length)
+                AddLog("As contas Citrix foram adicionadas, mas os nomes amigáveis não puderam ser atualizados.", LogLevel.Error);
 
             if (configured)
             {
-                UpdateStatusLabel($"Loja Citrix adicionada: {store.Name}.");
-                MessageBox.Show($"A loja \"{store.Name}\" foi adicionada ao Citrix Workspace.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var configuredSummary = string.Join(
+                    "\n",
+                    selectedStores.Select(store =>
+                        $"• {store.Name}{(store.IsPrimary && selectedStores.Length > 1 ? " (Principal)" : string.Empty)}"));
+                UpdateStatusLabel($"{string.Join(" e ", configuredStores)} configurada(s).");
+                MessageBox.Show(
+                    "As contas selecionadas foram configuradas e permanecem removíveis:\n\n" +
+                    configuredSummary,
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show("NÃ£o foi possÃ­vel adicionar a loja. Verifique se o Citrix Workspace estÃ¡ aberto, atualizado e se a rede permite acessar o endereÃ§o selecionado.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UpdateStatusLabel("Configuração das contas Citrix incompleta.");
+                MessageBox.Show(
+                    $"A configuração ficou incompleta. Contas adicionadas: {string.Join(", ", configuredStores.DefaultIfEmpty("nenhuma"))}.",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+
+        private static async Task<bool> ApplyCitrixFriendlyNamesAsync(
+            IReadOnlyCollection<CitrixStoreOption> selectedStores)
+        {
+            const string sitesRegistryPath = @"Software\Citrix\Dazzle\Sites";
+            const string accountsRegistryPath = @"Software\Citrix\Receiver\CtxAccount";
+            var primaryStore =
+                selectedStores.FirstOrDefault(store => store.IsPrimary) ??
+                selectedStores.First();
+
+            // O Self-Service pode encerrar antes de terminar de persistir as chaves.
+            // Aguarda alguns instantes para aplicar os nomes na fonte usada pela
+            // janela "Adicionar ou remover contas".
+            for (var attempt = 0; attempt < 12; attempt++)
+            {
+                var matchedStores = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                using (var sitesKey = Registry.CurrentUser.OpenSubKey(sitesRegistryPath, writable: true))
+                {
+                    if (sitesKey != null)
+                    {
+                        foreach (var siteKeyName in sitesKey.GetSubKeyNames())
+                        {
+                            using var siteKey = sitesKey.OpenSubKey(siteKeyName, writable: true);
+                            var configUrl = siteKey?.GetValue("configUrl")?.ToString();
+                            var store = selectedStores.FirstOrDefault(candidate =>
+                                CitrixUrlsMatch(candidate.DiscoveryUrl, configUrl));
+                            if (siteKey == null || store == null)
+                                continue;
+
+                            siteKey.SetValue("name", store.Name, RegistryValueKind.String);
+                            siteKey.SetValue("StoreName", store.Name, RegistryValueKind.String);
+                            siteKey.SetValue(
+                                "IsPrimary",
+                                ReferenceEquals(store, primaryStore) ? "True" : "False",
+                                RegistryValueKind.String);
+                            matchedStores.Add(store.Name);
+                        }
+                    }
+                }
+
+                using (var accountsKey = Registry.CurrentUser.OpenSubKey(accountsRegistryPath, writable: true))
+                {
+                    if (accountsKey != null)
+                    {
+                        foreach (var accountKeyName in accountsKey.GetSubKeyNames())
+                        {
+                            using var accountKey = accountsKey.OpenSubKey(accountKeyName, writable: true);
+                            var accountName = accountKey?.GetValue("Name")?.ToString();
+                            var store = selectedStores.FirstOrDefault(candidate =>
+                                string.Equals(candidate.Name, accountName, StringComparison.OrdinalIgnoreCase));
+                            if (accountKey == null || store == null)
+                                continue;
+
+                            accountKey.SetValue("Name", store.Name, RegistryValueKind.String);
+                            accountKey.SetValue("Description", store.Name, RegistryValueKind.String);
+                            accountKey.SetValue(
+                                "IsPrimary",
+                                ReferenceEquals(store, primaryStore) ? "true" : "false",
+                                RegistryValueKind.String);
+                        }
+                    }
+                }
+
+                if (matchedStores.Count == selectedStores.Count)
+                    return true;
+
+                await Task.Delay(300);
+            }
+
+            return false;
+        }
+
+        private static bool CitrixUrlsMatch(string expectedUrl, string? actualUrl)
+        {
+            if (string.IsNullOrWhiteSpace(actualUrl))
+                return false;
+
+            return string.Equals(
+                expectedUrl.TrimEnd('/'),
+                actualUrl.TrimEnd('/'),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IEnumerable<string> GetCitrixStoreRemovalUrls(CitrixStoreOption store)
+        {
+            yield return store.DiscoveryUrl;
+
+            // Limpa também contas criadas pelas versões intermediárias do Toolkit,
+            // que trocaram a URL de discovery por "servidor?NomeDaLoja".
+            if (Uri.TryCreate(store.DiscoveryUrl, UriKind.Absolute, out var uri) &&
+                string.IsNullOrEmpty(uri.Query))
+            {
+                var legacyUrl =
+                    $"{uri.GetLeftPart(UriPartial.Authority)}?{Uri.EscapeDataString(store.Name)}";
+                if (!string.Equals(legacyUrl, store.DiscoveryUrl, StringComparison.OrdinalIgnoreCase))
+                    yield return legacyUrl;
+
+                // A configuração antiga da CitrixEB utilizava apenas a raiz.
+                if (store.Name == "CitrixEB" && uri.AbsolutePath != "/")
+                    yield return uri.GetLeftPart(UriPartial.Authority);
             }
         }
 
@@ -3696,7 +4137,320 @@ namespace GelitaITToolkit.Forms
             return candidates.FirstOrDefault(File.Exists);
         }
 
+        private static string? FindCitrixStoreBrowseExecutable()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe")
+            };
+
+            return candidates.FirstOrDefault(File.Exists);
+        }
+
         // ==== ABA FERRAMENTAS ====
+
+        private async void ToolsWindows25H2Button_Click(object? sender, EventArgs e)
+        {
+            var updateService = new WindowsFeatureUpdateService();
+            var eligibility = updateService.GetEligibility();
+            if (!eligibility.CanInstall)
+            {
+                var reason = WindowsFeatureUpdateService.BuildEligibilityFailureMessage(eligibility);
+                AddLog($"Atualização para Windows 11 25H2 não iniciada: {reason}", LogLevel.Warning);
+                MessageBox.Show(
+                    $"{reason}\n\nSistema: {eligibility.ProductName}\n" +
+                    $"Versão: {eligibility.DisplayVersion}\nBuild: {eligibility.FullBuild}",
+                    "Windows 11 25H2",
+                    MessageBoxButtons.OK,
+                    eligibility.IsAlready25H2 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                return;
+            }
+
+            string packagePath;
+            try
+            {
+                packagePath = GetConfiguredPath("windows25H2");
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Pacote Windows 11 25H2 não configurado: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("O caminho do pacote Windows 11 25H2 não está configurado.", "Windows 11 25H2", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            var validation = await updateService.ValidatePackageAsync(packagePath);
+            if (!validation.Success)
+            {
+                AddLog($"Atualização 25H2 bloqueada: {validation.Message}", LogLevel.Error);
+                MessageBox.Show(validation.Message, "Pacote Bloqueado", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (MessageBox.Show(
+                    $"O computador atende aos pré-requisitos:\n\n" +
+                    $"Windows: {eligibility.DisplayVersion}\nBuild: {eligibility.FullBuild}\n" +
+                    $"Pacote: KB5054156\nAssinatura e SHA-256: válidos\n\n" +
+                    "A atualização será instalada silenciosamente e exigirá reinicialização. Continuar?",
+                    "Atualizar Windows 11 para 25H2",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            UpdateStatusLabel("Instalando Windows 11 25H2...");
+            AddLog("Iniciando instalação validada do enablement package KB5054156.", LogLevel.Info);
+            var result = await updateService.InstallAsync(packagePath);
+            AddLog(result.Message, result.Success ? LogLevel.Info : LogLevel.Error);
+            UpdateStatusLabel(result.Success ? "Windows 11 25H2 instalado; reinicialização pendente." : "Falha na atualização para 25H2.");
+
+            if (!result.Success)
+            {
+                MessageBox.Show(result.Message, "Windows 11 25H2", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (result.AlreadyInstalled)
+            {
+                MessageBox.Show(result.Message, "Windows 11 25H2", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (MessageBox.Show(
+                    $"{result.Message}\n\nDeseja reiniciar o computador agora?",
+                    "Windows 11 25H2",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                AddLog("Reinicialização solicitada para concluir o Windows 11 25H2.", LogLevel.Info);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "shutdown.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    ArgumentList = { "/r", "/t", "0" }
+                });
+            }
+        }
+
+        private void ToolsValidateScannersButton_Click(object? sender, EventArgs e)
+        {
+            var scannerService = new ScannerService();
+            var scannersList = FindControl<ListBox>("ScannersListBox");
+            var scanners = scannersList?.SelectedItems.Cast<Scanner>().ToList();
+            if (scanners == null || scanners.Count == 0)
+                scanners = scannerService.GetConfiguredEpsonScanners();
+            if (scanners.Count == 0)
+            {
+                MessageBox.Show("Nenhum scanner configurado foi encontrado.", "Validar Scanners", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var validator = new ScannerValidationService();
+            var results = scanners.SelectMany(scanner =>
+                new[] { $"[{scanner.Name} — {scanner.IpAddress}]" }
+                    .Concat(validator.Validate(scanner).Select(result => result.ToString()))).ToList();
+            var summary = string.Join(Environment.NewLine, results);
+            var success = !results.Any(line => line.StartsWith("⚠", StringComparison.Ordinal));
+            AddLog($"Validação Epson/NAPS2 concluída para {scanners.Count} scanner(s).", success ? LogLevel.Info : LogLevel.Warning);
+            MessageBox.Show(summary, "Validação Epson Scan 2 e NAPS2", MessageBoxButtons.OK,
+                success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private async void ToolsRealScanTestButton_Click(object? sender, EventArgs e)
+        {
+            var scannersList = FindControl<ListBox>("ScannersListBox");
+            if (scannersList?.SelectedItems.Count != 1 || scannersList.SelectedItem is not Scanner scanner)
+            {
+                MessageBox.Show("Selecione exatamente um scanner na aba Scanners.", "Digitalização Real", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (MessageBox.Show(
+                    $"O NAPS2 iniciará uma digitalização real usando o perfil “{scanner.Name}”. Coloque uma folha no equipamento antes de continuar.",
+                    "Digitalização Real",
+                    MessageBoxButtons.OKCancel,
+                    MessageBoxIcon.Information) != DialogResult.OK)
+                return;
+
+            var outputDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                "Testes Scanner");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            var result = await new ScannerValidationService().RunRealScanTestAsync(scanner, outputDirectory, timeout.Token);
+            AddLog(result.ToString(), result.Success ? LogLevel.Info : LogLevel.Error);
+            MessageBox.Show(result.Details, result.Item, MessageBoxButtons.OK,
+                result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private async void ToolsPrinterConnectivityButton_Click(object? sender, EventArgs e)
+        {
+            var unit = GetSelectedUnit();
+            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
+            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            {
+                MessageBox.Show("Selecione a unidade e uma ou mais impressoras na aba Impressoras.", "Conectividade", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var results = new List<string>();
+            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            {
+                var ip = GetScannerIpForPrinter(unit, printer.Name);
+                if (string.IsNullOrWhiteSpace(ip))
+                {
+                    results.Add($"⚠ {printer.Name}: IP não identificado.");
+                    continue;
+                }
+
+                var port = await _printerService.TestRawPrintPortAsync(ip);
+                var web = await _printerService.TestDeviceWebPageAsync(ip);
+                results.Add(
+                    $"{(port && web.Url != null ? "✓" : "⚠")} {printer.Name} ({ip}): " +
+                    $"porta 9100 {(port ? "aberta" : "indisponível")}; página web {(web.Url ?? "indisponível")}.");
+            }
+
+            var summary = string.Join(Environment.NewLine, results);
+            AddLog($"Teste 9100/Web concluído para {results.Count} equipamento(s).", LogLevel.Info);
+            MessageBox.Show(summary, "Conectividade das Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private async void ToolsRepairOfflinePrintersButton_Click(object? sender, EventArgs e)
+        {
+            if (MessageBox.Show(
+                    "O Toolkit limpará trabalhos com erro, desmarcará o modo offline e reiniciará o spooler. Continuar?",
+                    "Corrigir Filas Offline",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+
+            var success = await _printerService.RepairOfflineQueuesAsync();
+            AddLog(success ? "Filas offline corrigidas e spooler reiniciado." : "Falha ao corrigir filas offline.",
+                success ? LogLevel.Info : LogLevel.Error);
+            MessageBox.Show(success ? "Reparo concluído." : "O reparo não foi concluído. Verifique os logs.",
+                "Filas Offline", MessageBoxButtons.OK, success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        }
+
+        private void ToolsCreateBackupButton_Click(object? sender, EventArgs e)
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Escolha onde salvar o backup do Toolkit",
+                UseDescriptionForTitle = true,
+                SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory)
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+                return;
+
+            try
+            {
+                var backupPath = new BackupService().CreateBackup(dialog.SelectedPath);
+                AddLog($"Backup criado: {backupPath}", LogLevel.Info);
+                MessageBox.Show($"Backup criado com sucesso:\n\n{backupPath}", "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha ao criar backup: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("Não foi possível criar o backup. Verifique os logs.", "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void ToolsSecurityStatusButton_Click(object? sender, EventArgs e)
+        {
+            UpdateStatusLabel("Verificando segurança do computador...");
+            try
+            {
+                var results = await new SystemSecurityService().GetStatusAsync();
+                var summary = string.Join(Environment.NewLine, results.Select(result => result.ToString()));
+                AddLog($"Diagnóstico de segurança concluído: {results.Count(result => result.Success)}/{results.Count} itens conformes.", LogLevel.Info);
+                MessageBox.Show(summary, "Segurança do Computador", MessageBoxButtons.OK,
+                    results.All(result => result.Success) ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha no diagnóstico de segurança: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("Não foi possível concluir o diagnóstico.", "Segurança", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                UpdateStatusLabel("Sistema pronto.");
+            }
+        }
+
+        private async void ToolsCheckUpdateButton_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                UpdateStatusLabel("Consultando versão disponível...");
+                var updateService = new UpdateService();
+                var update = await updateService.CheckAsync();
+                var message =
+                    $"Versão instalada: {update.InstalledVersion}\n" +
+                    $"Versão disponível: {update.AvailableVersion?.ToString() ?? "não identificada"}\n\n";
+                if (!update.UpdateAvailable)
+                {
+                    MessageBox.Show(message + "O Toolkit já está atualizado.", "Atualizações", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                if (!update.CanValidateDownload)
+                {
+                    MessageBox.Show(
+                        message + "Existe uma atualização, mas ela não possui um arquivo SHA-256 publicado. Por segurança, o download automático foi bloqueado.",
+                        "Atualização Bloqueada",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (MessageBox.Show(
+                        message + "Baixar e validar a atualização agora?",
+                        "Atualização Disponível",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) != DialogResult.Yes)
+                    return;
+
+                var downloadDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Downloads");
+                var downloaded = await updateService.DownloadAndValidateAsync(update, downloadDirectory);
+                AddLog($"Atualização baixada e validada por SHA-256: {downloaded}", LogLevel.Info);
+                UpdateStatusLabel("Preparando atualização automática...");
+                var preparedUpdate = await updateService.PrepareAutomaticUpdateAsync(
+                    downloaded,
+                    update.AvailableVersion!);
+
+                if (MessageBox.Show(
+                        "A atualização foi baixada, validada e está pronta.\n\n" +
+                        "O Toolkit será fechado, a versão atual será guardada como backup, " +
+                        "todos os arquivos serão atualizados e o programa abrirá novamente.\n\n" +
+                        "Instalar agora?",
+                        "Atualização Pronta",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) != DialogResult.Yes)
+                {
+                    AddLog($"Atualização preparada para instalação posterior: {downloaded}", LogLevel.Info);
+                    MessageBox.Show(
+                        $"O pacote validado foi mantido em:\n\n{downloaded}",
+                        "Atualização",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+
+                updateService.LaunchPreparedUpdate(preparedUpdate);
+                AddLog("Atualizador iniciado; encerrando o Toolkit para substituir os arquivos.", LogLevel.Info);
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha ao verificar atualização: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("Não foi possível verificar a atualização. Consulte os logs.", "Atualizações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                UpdateStatusLabel("Sistema pronto.");
+            }
+        }
 
         private void ToolsPrinterMgmtButton_Click(object sender, EventArgs e)
         {
@@ -4027,7 +4781,7 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA CONFIGURAÇÕES ====
 
-        private void SettingsReloadButton_Click(object sender, EventArgs e)
+        private async void SettingsReloadButton_Click(object sender, EventArgs e)
         {
             var statusTextBox = FindControl<RichTextBox>("SettingsStatusRichTextBox");
             var errors = _configService.ValidateConfigurationFiles();
@@ -4049,8 +4803,8 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                LoadConfiguration();
-                RefreshInstallationStatuses();
+                await LoadConfigurationAsync();
+                await RefreshInstallationStatusesAsync();
                 if (statusTextBox != null)
                 {
                     statusTextBox.ForeColor = Color.ForestGreen;

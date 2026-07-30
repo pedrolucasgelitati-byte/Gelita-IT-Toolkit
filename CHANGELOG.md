@@ -1,5 +1,26 @@
 # Histórico de versões
 
+## 1.0.3 — 2026-07-30
+
+- Seleção independente das contas CitrixBR e CitrixEB.
+- Configurações corporativas movidas para variáveis locais no arquivo `.env`.
+- Suporte a referências `${VARIAVEL}` nos arquivos JSON.
+- Endereços internos removidos dos arquivos atuais rastreados pelo Git.
+- Cálculo do IP de scanners generalizado para as redes configuradas.
+- Documentação consolidada em um único `README.md`.
+- Remoção de documentos antigos e artefatos desnecessários da raiz.
+
+## 1.0.2 — 2026-07-30
+
+- Configuração e validação de scanners Epson Scan 2 e perfis NAPS2 para usuários locais/AD.
+- Configuração conjunta das contas CitrixBR (principal) e CitrixEB.
+- Central de reparos, diagnóstico de segurança, backup e testes de conectividade.
+- Atualização assistida do Windows 11 24H2 para 25H2 com validação SHA-256.
+- Atualizador automático do Toolkit com backup, reinício e restauração em caso de falha.
+- Interface de Ferramentas reorganizada e inicialização otimizada.
+- Novo ícone com cantos arredondados e transparência.
+- Proteção de dados sensíveis nos logs e validação ampliada dos arquivos JSON.
+
 ## 1.0.1 — 2026-07-29
 
 - Corrige a configuração do primeiro scanner em máquinas sem `ConnectInfo.dat`.

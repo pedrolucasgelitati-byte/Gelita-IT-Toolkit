@@ -9,9 +9,9 @@
     <!-- Informações da Aplicação -->
     <AssemblyName>Gelita-IT-Toolkit</AssemblyName>
     <RootNamespace>GelitaITToolkit</RootNamespace>
-    <Version>1.0.1</Version>
-    <AssemblyVersion>1.0.1.0</AssemblyVersion>
-    <FileVersion>1.0.1.0</FileVersion>
+    <Version>1.0.3</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
     <Authors>Gelita AG - Service Desk</Authors>
     <Description>Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.</Description>
     <Product>Gelita IT Toolkit</Product>

@@ -5,8 +5,9 @@
     "sentinelOne": "Assets/SentinelOne",
     "sentinelMsi": "Assets/SentinelOne/SentinelInstaller_windows_64bit_v23_1_4_650.msi",
     "paloAlto": "Assets/PaloAlto Client",
-    "officeOdt": "C:/ODT",
-    "officeConfiguration": "C:/ODT/Configuração.xml"
+    "windows25H2": "Assets/WindowsUpdates/windows11.0-kb5054156-x64.msu",
+    "officeOdt": "${GELITA_OFFICE_ODT_DIRECTORY}",
+    "officeConfiguration": "${GELITA_OFFICE_CONFIGURATION}"
   },
   "programs": [
     {

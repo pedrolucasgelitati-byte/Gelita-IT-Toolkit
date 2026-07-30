@@ -81,6 +81,8 @@ publish/
 # Local environment variables
 .env
 .env.local
+.env.*
+!.env.example
 local.settings.json
 
 # Pacote local do SentinelOne: instalador e token não devem ir para o GitHub
@@ -91,3 +93,4 @@ Assets/PaloAlto Client/*.msi
 
 # Artefato intermediário de criação do ícone; apenas a versão final é usada pelo aplicativo
 Assets/Icons/Gelita-IT-Toolkit-taskbar-source.png
+Assets/Icons/Gelita-IT-Toolkit-rounded-source.png

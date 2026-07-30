@@ -5,6 +5,7 @@ namespace GelitaITToolkit.Services
     using System.Diagnostics;
     using System.Drawing.Printing;
     using System.Linq;
+    using System.Net.Http;
     using System.Net.Sockets;
     using System.Threading;
     using System.Threading.Tasks;
@@ -71,12 +72,23 @@ namespace GelitaITToolkit.Services
 
         public bool IsPrinterInstalled(string printerName)
         {
-            return PrinterSettings.InstalledPrinters.Cast<string>()
-                .Any(name =>
-                    string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith($"\\{printerName}", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith($"{printerName} on ", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith($"{printerName} em ", StringComparison.OrdinalIgnoreCase));
+            return IsPrinterInstalled(printerName, GetInstalledPrinterNames());
+        }
+
+        public IReadOnlyCollection<string> GetInstalledPrinterNames() =>
+            PrinterSettings.InstalledPrinters.Cast<string>().ToArray();
+
+        public bool IsPrinterInstalled(
+            string printerName,
+            IReadOnlyCollection<string> installedPrinterNames)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(printerName);
+            ArgumentNullException.ThrowIfNull(installedPrinterNames);
+            return installedPrinterNames.Any(name =>
+                string.Equals(name, printerName, StringComparison.OrdinalIgnoreCase) ||
+                name.EndsWith($"\\{printerName}", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith($"{printerName} on ", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith($"{printerName} em ", StringComparison.OrdinalIgnoreCase));
         }
 
         public async Task<bool> SetDefaultPrinter(Printer printer)
@@ -107,6 +119,61 @@ namespace GelitaITToolkit.Services
             {
                 return false;
             }
+        }
+
+        public async Task<(bool Http, bool Https, string? Url)> TestDeviceWebPageAsync(
+            string host,
+            int timeoutMilliseconds = 4000)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(host);
+            using var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+                AllowAutoRedirect = true
+            };
+            using var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromMilliseconds(timeoutMilliseconds)
+            };
+
+            foreach (var scheme in new[] { "https", "http" })
+            {
+                try
+                {
+                    using var response = await client.GetAsync($"{scheme}://{host}/", HttpCompletionOption.ResponseHeadersRead);
+                    if ((int)response.StatusCode < 500)
+                        return (scheme == "http", scheme == "https", $"{scheme}://{host}/");
+                }
+                catch
+                {
+                    // Tenta o próximo protocolo.
+                }
+            }
+
+            return (false, false, null);
+        }
+
+        public async Task<bool> RepairOfflineQueuesAsync()
+        {
+            const string script =
+                "$ErrorActionPreference='Stop'; " +
+                "Get-CimInstance Win32_Printer | Where-Object WorkOffline | " +
+                "ForEach-Object { Set-CimInstance -InputObject $_ -Property @{WorkOffline=$false} }; " +
+                "Get-Printer | Where-Object PrinterStatus -in @('Offline','Error') | " +
+                "ForEach-Object { Get-PrintJob -PrinterName $_.Name -ErrorAction SilentlyContinue | Remove-PrintJob -ErrorAction SilentlyContinue }; " +
+                "Restart-Service Spooler -Force";
+            var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(script));
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                UseShellExecute = true,
+                Verb = "runas",
+                ArgumentList = { "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded }
+            });
+            if (process == null)
+                return false;
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0;
         }
 
         public IReadOnlyList<IReadOnlyList<string>> FindDuplicateInstalledPrinters()
