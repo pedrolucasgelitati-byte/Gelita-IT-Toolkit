@@ -4,6 +4,7 @@ namespace GelitaITToolkit
     using System.IO;
     using System.Windows.Forms;
     using GelitaITToolkit.Forms;
+    using GelitaITToolkit.Helpers;
 
     /// <summary>
     /// Classe de entrada da aplicação Gelita IT Toolkit.
@@ -18,6 +19,7 @@ namespace GelitaITToolkit
         {
             try
             {
+                EnvironmentConfig.Load();
                 // Validar se o arquivo de configuração de impressoras existe
                 string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config", "printers.json");
                 

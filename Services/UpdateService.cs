@@ -17,7 +17,6 @@ namespace GelitaITToolkit.Services
 
     public sealed class UpdateService
     {
-        private const string Repository = "pedrolucasgelitati-byte/Gelita-IT-Toolkit";
         private readonly HttpClient _httpClient;
 
         public UpdateService(HttpClient? httpClient = null)
@@ -38,7 +37,7 @@ namespace GelitaITToolkit.Services
         {
             var installed = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0);
             using var response = await _httpClient.GetAsync(
-                $"https://api.github.com/repos/{Repository}/releases/latest",
+                $"https://api.github.com/repos/{EnvironmentConfig.GetRequired("GELITA_TOOLKIT_GITHUB_REPOSITORY")}/releases/latest",
                 cancellationToken);
             response.EnsureSuccessStatusCode();
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

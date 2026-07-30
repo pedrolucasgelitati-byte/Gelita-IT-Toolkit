@@ -4,6 +4,7 @@ namespace GelitaITToolkit.Forms
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Drawing;
+    using System.Drawing.Text;
     using System.IO;
     using System.Linq;
     using System.Net;
@@ -14,9 +15,9 @@ namespace GelitaITToolkit.Forms
     using System.Threading.Tasks;
     using System.Windows.Forms;
     using GelitaITToolkit.Helpers;
-    using Microsoft.Win32;
     using GelitaITToolkit.Models;
     using GelitaITToolkit.Services;
+    using Microsoft.Win32;
 
     /// <summary>
     /// Formulário principal da aplicação Gelita IT Toolkit.
@@ -110,7 +111,8 @@ namespace GelitaITToolkit.Forms
         /// RichTextBox para exibição de logs.
         /// </summary>
         private RichTextBox _logsRichTextBox;
-        private ComboBox _citrixStoresComboBox = null!;
+        private CheckedListBox _citrixStoresCheckedListBox = null!;
+        private bool _isConfiguringCitrix;
         private SplitContainer _navigationContainer = null!;
         private Panel _sideNavigation = null!;
         private Label _sideNavigationTitle = null!;
@@ -126,10 +128,20 @@ namespace GelitaITToolkit.Forms
             "GelitaITToolkit",
             "execution-history.log");
 
-        private static readonly Color GelitaNavy = Color.FromArgb(0, 59, 112);
-        private static readonly Color GelitaYellow = Color.FromArgb(245, 169, 0);
-        private static readonly Color GelitaLight = Color.FromArgb(247, 248, 250);
-        private static readonly Color GelitaBorder = Color.FromArgb(220, 226, 233);
+        // GELITA Content Style Guide
+        private static readonly Color GelitaNavy = ColorTranslator.FromHtml("#004279");
+        private static readonly Color GelitaOrange = ColorTranslator.FromHtml("#F7A600");
+        private static readonly Color GelitaMatterhorn = ColorTranslator.FromHtml("#575656");
+        private static readonly Color GelitaBlack = ColorTranslator.FromHtml("#0B0B0B");
+        private static readonly Color GelitaSnow = ColorTranslator.FromHtml("#FAFAFA");
+        private static readonly Color GelitaBorder = Color.FromArgb(196, 196, 196);
+        private static readonly PrivateFontCollection GelitaFonts = new();
+        private static FontFamily? _gelitaFontFamily;
+
+        // Mantém o nome antigo internamente para reduzir ruído nos componentes
+        // existentes; o valor agora é o laranja oficial do guia.
+        private static Color GelitaYellow => GelitaOrange;
+        private static Color GelitaLight => GelitaSnow;
 
         #endregion
 
@@ -160,10 +172,12 @@ namespace GelitaITToolkit.Forms
             this.MinimizeBox = true;
             this.AutoScaleMode = AutoScaleMode.Dpi;
             this.BackColor = GelitaLight;
+            LoadGelitaFonts();
+            this.Font = CreateGelitaFont(9f);
 
             // Criar componentes
             InitializeComponent();
-            ApplyReadableFontScale(this);
+            ApplyGelitaTypography(this);
         }
 
         private static Icon LoadApplicationIcon()
@@ -189,19 +203,41 @@ namespace GelitaITToolkit.Forms
             return File.Exists(fallbackIconPath) ? new Icon(fallbackIconPath) : SystemIcons.Application;
         }
 
-        private static void ApplyReadableFontScale(Control parent)
+        private static void LoadGelitaFonts()
+        {
+            if (_gelitaFontFamily != null)
+                return;
+
+            var fontsDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts");
+            foreach (var fontPath in new[]
+                     {
+                         Path.Combine(fontsDirectory, "Lato-Regular.ttf"),
+                         Path.Combine(fontsDirectory, "Lato-Bold.ttf")
+                     })
+            {
+                if (File.Exists(fontPath))
+                    GelitaFonts.AddFontFile(fontPath);
+            }
+
+            _gelitaFontFamily = GelitaFonts.Families.FirstOrDefault();
+        }
+
+        private static Font CreateGelitaFont(float size, FontStyle style = FontStyle.Regular) =>
+            _gelitaFontFamily != null
+                ? new Font(_gelitaFontFamily, size, style, GraphicsUnit.Point)
+                : new Font("Lato", size, style, GraphicsUnit.Point);
+
+        private static void ApplyGelitaTypography(Control parent)
         {
             foreach (Control control in parent.Controls)
             {
-                if (control.Font.SizeInPoints <= 10.1f)
-                {
-                    var family = control.Font.FontFamily;
-                    var style = control.Font.Style;
-                    control.Font = new Font(family, control.Font.SizeInPoints + 1f, style);
-                }
+                var size = control.Font.SizeInPoints <= 10.1f
+                    ? control.Font.SizeInPoints + 1f
+                    : control.Font.SizeInPoints;
+                control.Font = CreateGelitaFont(size, control.Font.Style);
 
                 if (control.HasChildren)
-                    ApplyReadableFontScale(control);
+                    ApplyGelitaTypography(control);
             }
         }
 
@@ -242,11 +278,11 @@ namespace GelitaITToolkit.Forms
 
             _sideNavigationTitle = new Label
             {
-                Text = "Gelita IT Tool Kit",
+                Text = "GELITA  IT TOOLKIT",
                 Location = new Point(6, 12),
                 Size = new Size(204, 32),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                Font = CreateGelitaFont(14, FontStyle.Bold),
                 ForeColor = GelitaYellow
             };
             _sideNavigation.Controls.Add(_sideNavigationTitle);
@@ -282,12 +318,16 @@ namespace GelitaITToolkit.Forms
                     Cursor = Cursors.Hand
                 };
                 button.FlatAppearance.BorderSize = 0;
-                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 76, 145);
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(0, 82, 145);
+                button.FlatAppearance.MouseDownBackColor = GelitaOrange;
                 button.Click += SideNavigationButton_Click;
                 _sideNavigationButtons.Add(button);
                 _sideNavigation.Controls.Add(button);
                 top += 42;
             }
+
+            if (_sideNavigationButtons.Count > 0)
+                SetSelectedNavigationButton(_sideNavigationButtons[0]);
 
             _navigationContainer.Panel1.Controls.Add(_sideNavigation);
         }
@@ -298,7 +338,23 @@ namespace GelitaITToolkit.Forms
             {
                 var tab = _tabControl.TabPages.Cast<TabPage>().FirstOrDefault(page => page.Text == tabText);
                 if (tab != null)
+                {
                     _tabControl.SelectedTab = tab;
+                    SetSelectedNavigationButton((Button)sender);
+                }
+            }
+        }
+
+        private void SetSelectedNavigationButton(Button selectedButton)
+        {
+            foreach (var navigationButton in _sideNavigationButtons)
+            {
+                var isSelected = ReferenceEquals(navigationButton, selectedButton);
+                navigationButton.BackColor = isSelected ? GelitaOrange : GelitaNavy;
+                navigationButton.ForeColor = isSelected ? GelitaNavy : Color.White;
+                navigationButton.Font = CreateGelitaFont(
+                    navigationButton.Font.SizeInPoints,
+                    isSelected ? FontStyle.Bold : FontStyle.Regular);
             }
         }
 
@@ -340,7 +396,7 @@ namespace GelitaITToolkit.Forms
             _tabControl = new TabControl
             {
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI", 9),
+                Font = CreateGelitaFont(9),
                 SizeMode = TabSizeMode.Fixed,
                 ItemSize = new Size(0, 1)
             };
@@ -1272,7 +1328,7 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "Configura automaticamente CitrixBR (principal) e CitrixEB, mantendo as duas contas ligadas.",
+                Text = "Marque somente as contas necessárias para o usuário. CitrixBR vem selecionada por padrão.",
                 Location = new Point(20, 35),
                 Size = new Size(780, 28),
                 Font = new Font("Segoe UI", 9)
@@ -1280,40 +1336,42 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "Loja:",
+                Text = "Contas:",
                 Location = new Point(20, 82),
                 Size = new Size(100, 28),
                 Font = new Font("Segoe UI", 9)
             });
 
-            _citrixStoresComboBox = new ComboBox
+            _citrixStoresCheckedListBox = new CheckedListBox
             {
-                Name = "CitrixStoresComboBox",
+                Name = "CitrixStoresCheckedListBox",
                 Location = new Point(125, 78),
-                Size = new Size(380, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
+                Size = new Size(380, 66),
+                CheckOnClick = true,
+                BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 9)
             };
-            _citrixStoresComboBox.Items.AddRange(new object[]
+            _citrixStoresCheckedListBox.Items.AddRange(new object[]
             {
                 new CitrixStoreOption
                 {
-                    Name = "CitrixBR",
-                    DiscoveryUrl = "https://sf.gelitausa.com/Citrix/CitrixBRInternal/discovery",
+                    Name = "CitrixBRInternal",
+                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_BR_DISCOVERY_URL"),
                     IsPrimary = true
                 },
                 new CitrixStoreOption
                 {
                     Name = "CitrixEB",
-                    DiscoveryUrl = "https://citrixeb.eu.gelita.local"
+                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_EB_DISCOVERY_URL")
                 }
             });
-            storeGroup.Controls.Add(_citrixStoresComboBox);
+            _citrixStoresCheckedListBox.SetItemChecked(0, true);
+            storeGroup.Controls.Add(_citrixStoresCheckedListBox);
 
             storeGroup.Controls.Add(new Label
             {
                 Text = "EndereÃ§o:",
-                Location = new Point(20, 128),
+                Location = new Point(20, 155),
                 Size = new Size(100, 28),
                 Font = new Font("Segoe UI", 9)
             });
@@ -1321,21 +1379,27 @@ namespace GelitaITToolkit.Forms
             var storeUrlTextBox = new TextBox
             {
                 Name = "CitrixStoreUrlTextBox",
-                Location = new Point(125, 124),
+                Location = new Point(125, 151),
                 Size = new Size(700, 28),
                 ReadOnly = true,
                 Font = new Font("Segoe UI", 9),
                 BackColor = Color.White
             };
             storeGroup.Controls.Add(storeUrlTextBox);
-            _citrixStoresComboBox.SelectedIndexChanged += (_, _) =>
-                storeUrlTextBox.Text = (_citrixStoresComboBox.SelectedItem as CitrixStoreOption)?.DiscoveryUrl ?? string.Empty;
-            _citrixStoresComboBox.SelectedIndex = 0;
+            void UpdateSelectedCitrixUrls() =>
+                storeUrlTextBox.Text = string.Join(
+                    " | ",
+                    _citrixStoresCheckedListBox.CheckedItems
+                        .OfType<CitrixStoreOption>()
+                        .Select(store => $"{store.Name}: {store.DiscoveryUrl}"));
+            _citrixStoresCheckedListBox.ItemCheck += (_, _) =>
+                BeginInvoke((Action)UpdateSelectedCitrixUrls);
+            UpdateSelectedCitrixUrls();
 
             var addStoreButton = new Button
             {
-                Text = "Configurar CitrixBR + CitrixEB",
-                Location = new Point(125, 185),
+                Text = "Aplicar contas selecionadas",
+                Location = new Point(125, 198),
                 Size = new Size(230, 40),
                 BackColor = GelitaNavy,
                 ForeColor = Color.White,
@@ -1348,7 +1412,7 @@ namespace GelitaITToolkit.Forms
             var openWorkspaceButton = new Button
             {
                 Text = "Abrir Citrix Workspace",
-                Location = new Point(370, 185),
+                Location = new Point(370, 198),
                 Size = new Size(200, 40),
                 BackColor = GelitaYellow,
                 ForeColor = GelitaNavy,
@@ -1360,8 +1424,8 @@ namespace GelitaITToolkit.Forms
 
             storeGroup.Controls.Add(new Label
             {
-                Text = "O Citrix Workspace deve estar instalado. A tela de login pode ser exibida pelo Citrix apÃ³s a inclusÃ£o da loja.",
-                Location = new Point(20, 245),
+                Text = "As contas desmarcadas que são gerenciadas pelo Toolkit serão removidas. O Citrix pode solicitar autenticação.",
+                Location = new Point(20, 252),
                 Size = new Size(850, 30),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.DimGray
@@ -1405,34 +1469,58 @@ namespace GelitaITToolkit.Forms
                 ForeColor = Color.DimGray
             });
 
-            var cardsPanel = new FlowLayoutPanel
+            var cardsViewport = new Panel
             {
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = true,
                 AutoScroll = true,
-                Padding = new Padding(4, 12, 4, 12),
+                Padding = new Padding(12),
                 BackColor = Color.FromArgb(245, 247, 250)
             };
 
-            cardsPanel.Controls.Add(CreateToolsCategoryCard(
+            var cardsGrid = new TableLayoutPanel
+            {
+                Location = new Point(12, 12),
+                ColumnCount = 3,
+                RowCount = 1,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                BackColor = Color.Transparent
+            };
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+            cardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.334f));
+            cardsGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var toolColumns = Enumerable.Range(0, 3)
+                .Select(_ => new FlowLayoutPanel
+                {
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoSize = false,
+                    Margin = Padding.Empty,
+                    Padding = Padding.Empty,
+                    BackColor = Color.Transparent
+                })
+                .ToArray();
+            for (var columnIndex = 0; columnIndex < toolColumns.Length; columnIndex++)
+                cardsGrid.Controls.Add(toolColumns[columnIndex], columnIndex, 0);
+
+            toolColumns[0].Controls.Add(CreateToolsCategoryCard(
                 "Administração do Windows",
                 "Acessos rápidos aos consoles administrativos.",
                 ("Gerenciador de Impressoras", ToolsPrinterMgmtButton_Click),
                 ("Gerenciador de Dispositivos", ToolsDeviceMgmtButton_Click)));
 
-            cardsPanel.Controls.Add(CreateToolsCategoryCard(
+            toolColumns[1].Controls.Add(CreateToolsCategoryCard(
                 "Impressão e conectividade",
                 "Filas, portas, scanners e comunicação com equipamentos.",
                 ("Limpar Spool de Impressão", ToolsSpoolCleanButton_Click),
                 ("Reiniciar Serviço de Impressão", ToolsRestartSpoolerButton_Click),
                 ("Testador de Porta", ToolsPortTesterButton_Click),
-                ("Testar Porta 9100 e Página Web", ToolsPrinterConnectivityButton_Click),
                 ("Corrigir Filas Offline", ToolsRepairOfflinePrintersButton_Click),
-                ("Validar Epson Scan 2 e NAPS2", ToolsValidateScannersButton_Click),
                 ("Teste Real de Digitalização", ToolsRealScanTestButton_Click)));
 
-            cardsPanel.Controls.Add(CreateToolsCategoryCard(
+            toolColumns[2].Controls.Add(CreateToolsCategoryCard(
                 "Rede e Windows Update",
                 "Correções de rede e manutenção do sistema operacional.",
                 ("Renovar IP e Limpar DNS", ToolsRenewIpAndDnsButton_Click),
@@ -1442,7 +1530,7 @@ namespace GelitaITToolkit.Forms
                 ("Atualizar Tudo — winget", ToolsWingetUpdateAllButton_Click),
                 ("Atualizar Windows 11 para 25H2", ToolsWindows25H2Button_Click)));
 
-            cardsPanel.Controls.Add(CreateToolsCategoryCard(
+            toolColumns[0].Controls.Add(CreateToolsCategoryCard(
                 "Integridade do Windows",
                 "Limpeza, verificação e reparo dos componentes do Windows.",
                 ("Abrir Limpeza de Disco", ToolsDiskCleanupButton_Click),
@@ -1453,14 +1541,40 @@ namespace GelitaITToolkit.Forms
                 ("CHKDSK Online", ToolsChkdskScanButton_Click),
                 ("CHKDSK ao Reiniciar", ToolsChkdskRepairButton_Click)));
 
-            cardsPanel.Controls.Add(CreateToolsCategoryCard(
+            toolColumns[1].Controls.Add(CreateToolsCategoryCard(
                 "Segurança e manutenção",
                 "Conformidade, backup e atualização segura do Toolkit.",
                 ("Verificar Segurança do Computador", ToolsSecurityStatusButton_Click),
                 ("Criar Backup do Toolkit", ToolsCreateBackupButton_Click),
                 ("Verificar Atualização do Toolkit", ToolsCheckUpdateButton_Click)));
 
-            tabPage.Controls.Add(cardsPanel);
+            void ArrangeToolCards()
+            {
+                var viewportWidth = Math.Max(780, cardsViewport.ClientSize.Width - cardsViewport.Padding.Horizontal);
+                var columnWidth = viewportWidth / 3;
+                var columnHeights = new int[toolColumns.Length];
+
+                for (var columnIndex = 0; columnIndex < toolColumns.Length; columnIndex++)
+                {
+                    var column = toolColumns[columnIndex];
+                    column.Width = columnWidth;
+                    foreach (Control card in column.Controls)
+                        card.Width = Math.Max(250, columnWidth - card.Margin.Horizontal);
+
+                    columnHeights[columnIndex] = column.Controls
+                        .Cast<Control>()
+                        .Sum(card => card.Height + card.Margin.Vertical);
+                    column.Height = columnHeights[columnIndex];
+                }
+
+                cardsGrid.Width = viewportWidth;
+                cardsGrid.Height = columnHeights.Max();
+            }
+
+            cardsViewport.Controls.Add(cardsGrid);
+            cardsViewport.Resize += (_, _) => ArrangeToolCards();
+            tabPage.Enter += (_, _) => ArrangeToolCards();
+            tabPage.Controls.Add(cardsViewport);
             tabPage.Controls.Add(headerPanel);
             return tabPage;
         }
@@ -1477,7 +1591,7 @@ namespace GelitaITToolkit.Forms
                 Width = cardWidth,
                 Height = cardHeight,
                 BackColor = Color.White,
-                Margin = new Padding(8),
+                Margin = new Padding(8, 8, 8, 12),
                 Padding = new Padding(14),
                 BorderStyle = BorderStyle.FixedSingle
             };
@@ -1519,6 +1633,15 @@ namespace GelitaITToolkit.Forms
                 top += 46;
             }
 
+            void ResizeCardContents()
+            {
+                var contentWidth = Math.Max(180, card.ClientSize.Width - 28);
+                foreach (Control child in card.Controls)
+                    child.Width = contentWidth;
+            }
+
+            card.Resize += (_, _) => ResizeCardContents();
+            ResizeCardContents();
             return card;
         }
 
@@ -1808,7 +1931,7 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 1.0.2",
+                Text = "Versão: 1.0.3",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -2075,13 +2198,31 @@ namespace GelitaITToolkit.Forms
             if (!int.TryParse(numberPart, out var printerNumber))
                 return null;
 
-            return unit.PrinterIpRange switch
+            var range = unit.PrinterIpRange.Trim();
+            var firstAddress = range
+                .Split(new[] { '/', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(firstAddress))
+                return null;
+
+            var octets = firstAddress.Split('.');
+            if (octets.Length != 4 ||
+                !octets.Take(3).All(octet => byte.TryParse(octet, out _)) ||
+                printerNumber is < 1 or > 254)
+                return null;
+
+            if (range.Contains('-', StringComparison.Ordinal))
             {
-                "10.55.44.0/24" => $"10.55.44.{printerNumber}",
-                "10.55.12.42 - 10.55.12.63" when printerNumber is >= 42 and <= 63 => $"10.55.12.{printerNumber}",
-                "10.55.103.130 - 10.55.103.156" when printerNumber is >= 130 and <= 156 => $"10.55.103.{printerNumber}",
-                _ => null
-            };
+                var addresses = range.Split('-', StringSplitOptions.TrimEntries);
+                if (addresses.Length != 2 ||
+                    !int.TryParse(addresses[0].Split('.').LastOrDefault(), out var start) ||
+                    !int.TryParse(addresses[1].Split('.').LastOrDefault(), out var end) ||
+                    printerNumber < start ||
+                    printerNumber > end)
+                    return null;
+            }
+
+            return $"{octets[0]}.{octets[1]}.{octets[2]}.{printerNumber}";
         }
 
         #endregion
@@ -2194,10 +2335,16 @@ namespace GelitaITToolkit.Forms
                 button.FlatAppearance.BorderSize = 1;
                 button.FlatAppearance.BorderColor = GelitaBorder;
                 button.FlatAppearance.MouseOverBackColor = button.BackColor == GelitaYellow
-                    ? Color.FromArgb(255, 193, 42)
-                    : button.BackColor == GelitaNavy ? Color.FromArgb(0, 76, 145) : Color.White;
+                    ? Color.FromArgb(255, 188, 46)
+                    : button.BackColor == GelitaNavy ? Color.FromArgb(0, 82, 145) : GelitaSnow;
                 button.Cursor = Cursors.Hand;
             }
+
+            if (control is Label label && label.ForeColor == SystemColors.ControlText)
+                label.ForeColor = GelitaMatterhorn;
+
+            if (control is CheckBox checkBox && checkBox.ForeColor == SystemColors.ControlText)
+                checkBox.ForeColor = GelitaBlack;
 
             foreach (Control child in control.Controls)
                 ApplyVisualStyle(child);
@@ -2693,7 +2840,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 1.0.2\n\n" +
+                "Versão 1.0.3\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",
@@ -3699,63 +3846,142 @@ namespace GelitaITToolkit.Forms
 
         private async void CitrixAddStoreButton_Click(object? sender, EventArgs e)
         {
+            if (_isConfiguringCitrix)
+                return;
+
+            _isConfiguringCitrix = true;
+            if (sender is Button button)
+                button.Enabled = false;
+
+            try
+            {
+                await ConfigureSelectedCitrixStoresAsync();
+            }
+            catch (Exception ex)
+            {
+                AddLog($"Falha inesperada ao configurar o Citrix: {ex.Message}", LogLevel.Error);
+                UpdateStatusLabel("Falha ao configurar as contas Citrix.");
+                MessageBox.Show(
+                    $"Não foi possível configurar as contas Citrix:\n\n{ex.Message}",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _isConfiguringCitrix = false;
+                if (sender is Button completedButton && !completedButton.IsDisposed)
+                    completedButton.Enabled = true;
+            }
+        }
+
+        private async Task ConfigureSelectedCitrixStoresAsync()
+        {
             var selfServicePath = FindCitrixSelfServiceExecutable();
+            var storeBrowsePath = FindCitrixStoreBrowseExecutable();
             if (selfServicePath == null)
             {
-                AddLog("Citrix Workspace nÃ£o encontrado para adicionar a loja.", LogLevel.Warning);
-                MessageBox.Show("O Citrix Workspace nÃ£o foi encontrado neste computador. Instale-o antes de adicionar uma loja.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AddLog("Citrix Workspace ou Storebrowse não encontrado.", LogLevel.Warning);
+                MessageBox.Show(
+                    "O Citrix Workspace não foi encontrado por completo neste computador. Repare ou reinstale o aplicativo antes de configurar as contas.",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
-            var stores = _citrixStoresComboBox.Items
+            var managedStores = _citrixStoresCheckedListBox.Items
                 .OfType<CitrixStoreOption>()
-                .OrderByDescending(store => store.IsPrimary)
                 .ToArray();
-            var workingDirectory = Path.GetDirectoryName(selfServicePath);
-
-            UpdateStatusLabel("Configurando CitrixBR e CitrixEB...");
-
-            // A primeira conta adicionada é exibida como principal pelo Workspace.
-            // Removemos somente as duas contas gerenciadas pelo Toolkit e as
-            // recriamos na ordem CitrixBR, CitrixEB.
-            for (var storeIndex = stores.Length - 1; storeIndex >= 0; storeIndex--)
+            var selectedStores = _citrixStoresCheckedListBox.CheckedItems
+                .OfType<CitrixStoreOption>()
+                .ToArray();
+            if (selectedStores.Length == 0)
             {
-                var store = stores[storeIndex];
-                await RunProcessAsync(
-                    selfServicePath,
-                    $"storebrowse -d \"{store.DiscoveryUrl}\"",
-                    workingDirectory);
+                MessageBox.Show(
+                    "Marque CitrixBR, CitrixEB ou as duas contas.",
+                    "Citrix",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var selfServiceWorkingDirectory = Path.GetDirectoryName(selfServicePath);
+            var removalTimeout = TimeSpan.FromSeconds(8);
+            var additionTimeout = TimeSpan.FromSeconds(30);
+
+            UpdateStatusLabel($"Configurando {string.Join(" e ", selectedStores.Select(store => store.Name))}...");
+
+            // Remove registros invisíveis criados por versões que usavam o
+            // Storebrowse independente em vez do cadastro do Self-Service.
+            if (storeBrowsePath != null)
+            {
+                var storeBrowseWorkingDirectory = Path.GetDirectoryName(storeBrowsePath);
+                foreach (var store in managedStores)
+                {
+                    foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
+                    {
+                        await RunProcessAsync(
+                            storeBrowsePath,
+                            $"-d \"{storeUrl}\"",
+                            storeBrowseWorkingDirectory,
+                            removalTimeout);
+                    }
+                }
+            }
+
+            // Remove somente as contas gerenciadas pelo Toolkit. Depois adiciona
+            // apenas as marcadas; quando ambas são escolhidas, CitrixBR vem primeiro.
+            for (var storeIndex = managedStores.Length - 1; storeIndex >= 0; storeIndex--)
+            {
+                var store = managedStores[storeIndex];
+                foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
+                {
+                    await RunProcessAsync(
+                        selfServicePath,
+                        $"storebrowse -d \"{storeUrl}\"",
+                        selfServiceWorkingDirectory,
+                        removalTimeout);
+                }
             }
 
             var configuredStores = new List<string>();
-            foreach (var store in stores)
+            foreach (var store in selectedStores)
             {
                 var added = await RunProcessAsync(
                     selfServicePath,
                     $"storebrowse -a \"{store.DiscoveryUrl}\"",
-                    workingDirectory);
+                    selfServiceWorkingDirectory,
+                    additionTimeout);
 
                 AddLog(
                     added
-                        ? $"Conta Citrix adicionada e ligada: {store.Name}{(store.IsPrimary ? " (principal)" : string.Empty)}."
+                        ? $"Conta Citrix adicionada: {store.Name}{(store.IsPrimary ? " (principal)" : string.Empty)}."
                         : $"Falha ao adicionar a conta Citrix: {store.Name}.",
                     added ? LogLevel.Info : LogLevel.Error);
 
                 if (added)
-                {
                     configuredStores.Add(store.Name);
-                }
             }
 
-            var configured = configuredStores.Count == stores.Length;
+            var friendlyNamesApplied = configuredStores.Count == selectedStores.Length &&
+                await ApplyCitrixFriendlyNamesAsync(selectedStores);
+            var configured =
+                configuredStores.Count == selectedStores.Length &&
+                friendlyNamesApplied;
+            if (!friendlyNamesApplied && configuredStores.Count == selectedStores.Length)
+                AddLog("As contas Citrix foram adicionadas, mas os nomes amigáveis não puderam ser atualizados.", LogLevel.Error);
 
             if (configured)
             {
-                UpdateStatusLabel("CitrixBR (principal) e CitrixEB configuradas.");
+                var configuredSummary = string.Join(
+                    "\n",
+                    selectedStores.Select(store =>
+                        $"• {store.Name}{(store.IsPrimary && selectedStores.Length > 1 ? " (Principal)" : string.Empty)}"));
+                UpdateStatusLabel($"{string.Join(" e ", configuredStores)} configurada(s).");
                 MessageBox.Show(
-                    "As duas contas foram configuradas e estão ligadas:\n\n" +
-                    "• CitrixBR (Principal)\n" +
-                    "• CitrixEB",
+                    "As contas selecionadas foram configuradas e permanecem removíveis:\n\n" +
+                    configuredSummary,
                     "Citrix",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -3764,11 +3990,113 @@ namespace GelitaITToolkit.Forms
             {
                 UpdateStatusLabel("Configuração das contas Citrix incompleta.");
                 MessageBox.Show(
-                    $"A configuração ficou incompleta. Contas adicionadas: {string.Join(", ", configuredStores.DefaultIfEmpty("nenhuma"))}.\n\n" +
-                    "Verifique se o Citrix Workspace está aberto e se a rede permite acessar os dois endereços.",
+                    $"A configuração ficou incompleta. Contas adicionadas: {string.Join(", ", configuredStores.DefaultIfEmpty("nenhuma"))}.",
                     "Citrix",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+            }
+        }
+
+        private static async Task<bool> ApplyCitrixFriendlyNamesAsync(
+            IReadOnlyCollection<CitrixStoreOption> selectedStores)
+        {
+            const string sitesRegistryPath = @"Software\Citrix\Dazzle\Sites";
+            const string accountsRegistryPath = @"Software\Citrix\Receiver\CtxAccount";
+            var primaryStore =
+                selectedStores.FirstOrDefault(store => store.IsPrimary) ??
+                selectedStores.First();
+
+            // O Self-Service pode encerrar antes de terminar de persistir as chaves.
+            // Aguarda alguns instantes para aplicar os nomes na fonte usada pela
+            // janela "Adicionar ou remover contas".
+            for (var attempt = 0; attempt < 12; attempt++)
+            {
+                var matchedStores = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                using (var sitesKey = Registry.CurrentUser.OpenSubKey(sitesRegistryPath, writable: true))
+                {
+                    if (sitesKey != null)
+                    {
+                        foreach (var siteKeyName in sitesKey.GetSubKeyNames())
+                        {
+                            using var siteKey = sitesKey.OpenSubKey(siteKeyName, writable: true);
+                            var configUrl = siteKey?.GetValue("configUrl")?.ToString();
+                            var store = selectedStores.FirstOrDefault(candidate =>
+                                CitrixUrlsMatch(candidate.DiscoveryUrl, configUrl));
+                            if (siteKey == null || store == null)
+                                continue;
+
+                            siteKey.SetValue("name", store.Name, RegistryValueKind.String);
+                            siteKey.SetValue("StoreName", store.Name, RegistryValueKind.String);
+                            siteKey.SetValue(
+                                "IsPrimary",
+                                ReferenceEquals(store, primaryStore) ? "True" : "False",
+                                RegistryValueKind.String);
+                            matchedStores.Add(store.Name);
+                        }
+                    }
+                }
+
+                using (var accountsKey = Registry.CurrentUser.OpenSubKey(accountsRegistryPath, writable: true))
+                {
+                    if (accountsKey != null)
+                    {
+                        foreach (var accountKeyName in accountsKey.GetSubKeyNames())
+                        {
+                            using var accountKey = accountsKey.OpenSubKey(accountKeyName, writable: true);
+                            var accountName = accountKey?.GetValue("Name")?.ToString();
+                            var store = selectedStores.FirstOrDefault(candidate =>
+                                string.Equals(candidate.Name, accountName, StringComparison.OrdinalIgnoreCase));
+                            if (accountKey == null || store == null)
+                                continue;
+
+                            accountKey.SetValue("Name", store.Name, RegistryValueKind.String);
+                            accountKey.SetValue("Description", store.Name, RegistryValueKind.String);
+                            accountKey.SetValue(
+                                "IsPrimary",
+                                ReferenceEquals(store, primaryStore) ? "true" : "false",
+                                RegistryValueKind.String);
+                        }
+                    }
+                }
+
+                if (matchedStores.Count == selectedStores.Count)
+                    return true;
+
+                await Task.Delay(300);
+            }
+
+            return false;
+        }
+
+        private static bool CitrixUrlsMatch(string expectedUrl, string? actualUrl)
+        {
+            if (string.IsNullOrWhiteSpace(actualUrl))
+                return false;
+
+            return string.Equals(
+                expectedUrl.TrimEnd('/'),
+                actualUrl.TrimEnd('/'),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static IEnumerable<string> GetCitrixStoreRemovalUrls(CitrixStoreOption store)
+        {
+            yield return store.DiscoveryUrl;
+
+            // Limpa também contas criadas pelas versões intermediárias do Toolkit,
+            // que trocaram a URL de discovery por "servidor?NomeDaLoja".
+            if (Uri.TryCreate(store.DiscoveryUrl, UriKind.Absolute, out var uri) &&
+                string.IsNullOrEmpty(uri.Query))
+            {
+                var legacyUrl =
+                    $"{uri.GetLeftPart(UriPartial.Authority)}?{Uri.EscapeDataString(store.Name)}";
+                if (!string.Equals(legacyUrl, store.DiscoveryUrl, StringComparison.OrdinalIgnoreCase))
+                    yield return legacyUrl;
+
+                // A configuração antiga da CitrixEB utilizava apenas a raiz.
+                if (store.Name == "CitrixEB" && uri.AbsolutePath != "/")
+                    yield return uri.GetLeftPart(UriPartial.Authority);
             }
         }
 
@@ -3804,6 +4132,17 @@ namespace GelitaITToolkit.Forms
             {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Citrix", "ICA Client", "SelfServicePlugin", "SelfService.exe"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Citrix", "ICA Client", "SelfServicePlugin", "SelfService.exe")
+            };
+
+            return candidates.FirstOrDefault(File.Exists);
+        }
+
+        private static string? FindCitrixStoreBrowseExecutable()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe")
             };
 
             return candidates.FirstOrDefault(File.Exists);

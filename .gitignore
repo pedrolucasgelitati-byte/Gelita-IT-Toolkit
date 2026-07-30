@@ -81,6 +81,8 @@ publish/
 # Local environment variables
 .env
 .env.local
+.env.*
+!.env.example
 local.settings.json
 
 # Pacote local do SentinelOne: instalador e token não devem ir para o GitHub

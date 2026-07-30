@@ -6,6 +6,7 @@ namespace GelitaITToolkit.Services
     using System.Linq;
     using System.Text.Json;
     using System.Windows.Forms;
+    using GelitaITToolkit.Helpers;
     using GelitaITToolkit.Models;
 
     /// <summary>
@@ -73,7 +74,7 @@ namespace GelitaITToolkit.Services
                 }
 
                 // Lê arquivo JSON
-                string jsonContent = File.ReadAllText(filePath);
+                string jsonContent = ReadConfiguration(filePath);
 
                 // Desserializa
                 using (JsonDocument doc = JsonDocument.Parse(jsonContent))
@@ -164,10 +165,10 @@ namespace GelitaITToolkit.Services
             try
             {
                 settings = JsonSerializer.Deserialize<ToolkitSettings>(
-                    File.ReadAllText(Path.Combine(_configPath, "toolkit-settings.json")),
+                    ReadConfiguration(Path.Combine(_configPath, "toolkit-settings.json")),
                     _jsonOptions) ?? new ToolkitSettings();
                 hashes = JsonSerializer.Deserialize<InstallerHashSettings>(
-                    File.ReadAllText(Path.Combine(_configPath, "installer-hashes.json")),
+                    ReadConfiguration(Path.Combine(_configPath, "installer-hashes.json")),
                     _jsonOptions) ?? new InstallerHashSettings();
                 return true;
             }
@@ -212,7 +213,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
-                var policy = JsonSerializer.Deserialize<SecurityPolicy>(File.ReadAllText(path), _jsonOptions);
+                var policy = JsonSerializer.Deserialize<SecurityPolicy>(ReadConfiguration(path), _jsonOptions);
                 if (policy == null || policy.AllowedLocalAdministrators.Count == 0)
                     errors.Add("security-policy.json deve possuir ao menos um administrador local permitido.");
                 else if (policy.AllowedLocalAdministrators.Any(string.IsNullOrWhiteSpace))
@@ -235,7 +236,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
-                using var document = JsonDocument.Parse(File.ReadAllText(path));
+                using var document = JsonDocument.Parse(ReadConfiguration(path));
                 if (!document.RootElement.TryGetProperty("units", out var units) ||
                     units.ValueKind != JsonValueKind.Array)
                 {
@@ -277,7 +278,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
-                var settings = JsonSerializer.Deserialize<ToolkitSettings>(File.ReadAllText(path), _jsonOptions);
+                var settings = JsonSerializer.Deserialize<ToolkitSettings>(ReadConfiguration(path), _jsonOptions);
                 if (settings == null || settings.Programs.Count == 0)
                 {
                     errors.Add("toolkit-settings.json não possui programas.");
@@ -314,7 +315,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
-                var settings = JsonSerializer.Deserialize<InstallerHashSettings>(File.ReadAllText(path), _jsonOptions);
+                var settings = JsonSerializer.Deserialize<InstallerHashSettings>(ReadConfiguration(path), _jsonOptions);
                 if (settings == null || settings.Hashes.Count == 0)
                 {
                     errors.Add("installer-hashes.json não possui hashes.");
@@ -391,7 +392,7 @@ namespace GelitaITToolkit.Services
                 }
 
                 // Lê arquivo JSON
-                string jsonContent = File.ReadAllText(filePath);
+                string jsonContent = ReadConfiguration(filePath);
 
                 // Desserializa
                 using (JsonDocument doc = JsonDocument.Parse(jsonContent))
@@ -480,7 +481,7 @@ namespace GelitaITToolkit.Services
                 }
 
                 // Lê arquivo JSON
-                string jsonContent = File.ReadAllText(filePath);
+                string jsonContent = ReadConfiguration(filePath);
 
                 var result = new Dictionary<string, Unit>();
 
@@ -527,7 +528,8 @@ namespace GelitaITToolkit.Services
   ""units"": [
     {
       ""name"": ""Maringá"",
-      ""printServer"": ""\\\\br-mga1-srv013v"",
+      ""printServer"": ""${GELITA_MARINGA_PRINT_SERVER}"",
+      ""printerIpRange"": ""${GELITA_MARINGA_PRINTER_NETWORK}"",
       ""printers"": [
         ""MG_PRINTER_224"",
         ""MG_PRINTER_225"",
@@ -536,7 +538,8 @@ namespace GelitaITToolkit.Services
     },
     {
       ""name"": ""Mococa"",
-      ""printServer"": ""\\\\br-mco1-srv001v"",
+      ""printServer"": ""${GELITA_MOCOCA_PRINT_SERVER}"",
+      ""printerIpRange"": ""${GELITA_MOCOCA_PRINTER_NETWORK}"",
       ""printers"": [
         ""MC_PRINTER_001"",
         ""MC_PRINTER_002""
@@ -544,7 +547,8 @@ namespace GelitaITToolkit.Services
     },
     {
       ""name"": ""Cotia"",
-      ""printServer"": ""\\\\br-cot1-srv001v"",
+      ""printServer"": ""${GELITA_COTIA_PRINT_SERVER}"",
+      ""printerIpRange"": ""${GELITA_COTIA_PRINTER_NETWORK}"",
       ""printers"": [
         ""CT_PRINTER_001"",
         ""CT_PRINTER_002"",
@@ -662,5 +666,8 @@ namespace GelitaITToolkit.Services
 
             return File.Exists(printersPath) && File.Exists(scannersPath) && File.Exists(unitsPath);
         }
+
+        private static string ReadConfiguration(string path) =>
+            EnvironmentConfig.Expand(File.ReadAllText(path));
     }
 }

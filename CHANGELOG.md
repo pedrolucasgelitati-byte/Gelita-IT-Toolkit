@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.0.3 — 2026-07-30
+
+- Seleção independente das contas CitrixBR e CitrixEB.
+- Configurações corporativas movidas para variáveis locais no arquivo `.env`.
+- Suporte a referências `${VARIAVEL}` nos arquivos JSON.
+- Endereços internos removidos dos arquivos atuais rastreados pelo Git.
+- Cálculo do IP de scanners generalizado para as redes configuradas.
+- Documentação consolidada em um único `README.md`.
+- Remoção de documentos antigos e artefatos desnecessários da raiz.
+
 ## 1.0.2 — 2026-07-30
 
 - Configuração e validação de scanners Epson Scan 2 e perfis NAPS2 para usuários locais/AD.
