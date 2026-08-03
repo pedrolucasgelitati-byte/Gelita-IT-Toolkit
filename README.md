@@ -228,13 +228,18 @@ Antes de distribuir:
 
 O botão de atualização baixa e substitui o programa completo, incluindo os arquivos distribuídos no pacote. O processo:
 
-1. Consulta a versão disponível.
+1. Consulta a versão e o SHA-256 do pacote disponível.
 2. Baixa o ZIP e seu arquivo `.sha256`.
 3. Valida a integridade.
 4. Fecha o Toolkit.
 5. Cria um backup da versão instalada.
 6. Substitui os arquivos e abre a nova versão.
 7. Restaura o backup automaticamente se a atualização falhar.
+
+Além do número da versão, o Toolkit compara o SHA-256 do pacote publicado com o
+pacote instalado. Assim, uma correção publicada na mesma versão também é
+oferecida como atualização. O workflow `publish-current-version.yml` recompila e
+substitui os arquivos da release atual a cada push na branch `main`.
 
 Se o repositório for privado, a API do GitHub pode responder **404 (Not Found)** em máquinas sem autenticação. O Toolkit pode usar um token somente de leitura fornecido pela variável de ambiente:
 

@@ -9,8 +9,13 @@ namespace GelitaITToolkit.Models
         public string ReleaseUrl { get; init; } = string.Empty;
         public string DownloadUrl { get; init; } = string.Empty;
         public string ChecksumUrl { get; init; } = string.Empty;
+        public string AvailablePackageHash { get; init; } = string.Empty;
+        public string InstalledPackageHash { get; init; } = string.Empty;
+        public bool PackageChanged =>
+            !string.IsNullOrWhiteSpace(AvailablePackageHash) &&
+            !string.Equals(AvailablePackageHash, InstalledPackageHash, StringComparison.OrdinalIgnoreCase);
         public bool UpdateAvailable =>
-            AvailableVersion != null && AvailableVersion > InstalledVersion;
+            (AvailableVersion != null && AvailableVersion > InstalledVersion) || PackageChanged;
         public bool CanValidateDownload =>
             !string.IsNullOrWhiteSpace(DownloadUrl) && !string.IsNullOrWhiteSpace(ChecksumUrl);
     }

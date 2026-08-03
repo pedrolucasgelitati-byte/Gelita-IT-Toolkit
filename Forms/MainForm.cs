@@ -4567,7 +4567,8 @@ namespace GelitaITToolkit.Forms
                 var update = await updateService.CheckAsync();
                 var message =
                     $"Versão instalada: {update.InstalledVersion}\n" +
-                    $"Versão disponível: {update.AvailableVersion?.ToString() ?? "não identificada"}\n\n";
+                    $"Versão disponível: {update.AvailableVersion?.ToString() ?? "não identificada"}\n" +
+                    $"Conteúdo publicado: {(update.PackageChanged ? "diferente do instalado" : "igual ao instalado")}\n\n";
                 if (!update.UpdateAvailable)
                 {
                     MessageBox.Show(message + "O Toolkit já está atualizado.", "Atualizações", MessageBoxButtons.OK, MessageBoxIcon.Information);

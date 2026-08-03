@@ -11,13 +11,18 @@ namespace GelitaITToolkit.Helpers
     /// <summary>Valida a integridade e a origem dos executáveis antes da execução.</summary>
     public static class SecurityHelper
     {
+        public static string CalculateSha256(string filePath)
+        {
+            using var stream = File.OpenRead(filePath);
+            return Convert.ToHexString(SHA256.HashData(stream));
+        }
+
         public static bool HasExpectedSha256(string filePath, string expectedHash)
         {
             if (!File.Exists(filePath) || string.IsNullOrWhiteSpace(expectedHash))
                 return false;
 
-            using var stream = File.OpenRead(filePath);
-            var actualHash = Convert.ToHexString(SHA256.HashData(stream));
+            var actualHash = CalculateSha256(filePath);
             return CryptographicOperations.FixedTimeEquals(
                 Convert.FromHexString(actualHash),
                 Convert.FromHexString(expectedHash));
