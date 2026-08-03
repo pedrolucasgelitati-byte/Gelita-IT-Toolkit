@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -51,7 +54,7 @@ jobs:
         run: |
           $baseName = "Gelita-IT-Toolkit-v${{ steps.version.outputs.version }}-win-x64"
           $zipPath = Join-Path $PWD "$baseName.zip"
-          $hashPath = Join-Path $PWD "$baseName.sha256"
+          $hashPath = Join-Path $PWD "$baseName.zip.sha256"
           Compress-Archive -Path .\publish\* -DestinationPath $zipPath -CompressionLevel Optimal
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
           "$hash  $baseName.zip" | Set-Content -LiteralPath $hashPath -Encoding ascii
@@ -59,6 +62,7 @@ jobs:
           "hash=$hashPath" >> $env:GITHUB_OUTPUT
 
       - name: Publicar na release da versão atual
+        if: github.event_name != 'pull_request'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

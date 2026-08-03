@@ -50,9 +50,16 @@ namespace GelitaITToolkit.Services
             var assets = root.GetProperty("assets").EnumerateArray().ToList();
             var zip = assets.FirstOrDefault(asset =>
                 asset.GetProperty("name").GetString()?.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase) == true);
+            var zipName = GetAssetName(zip);
             var checksum = assets.FirstOrDefault(asset =>
-                asset.GetProperty("name").GetString()?.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true ||
-                asset.GetProperty("name").GetString()?.EndsWith(".sha256.txt", StringComparison.OrdinalIgnoreCase) == true);
+                    string.Equals(GetAssetName(asset), zipName + ".sha256", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(GetAssetName(asset), zipName + ".sha256.txt", StringComparison.OrdinalIgnoreCase));
+            if (checksum.ValueKind != JsonValueKind.Object)
+            {
+                checksum = assets.FirstOrDefault(asset =>
+                    GetAssetName(asset).EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) ||
+                    GetAssetName(asset).EndsWith(".sha256.txt", StringComparison.OrdinalIgnoreCase));
+            }
             var checksumUrl = GetAssetUrl(checksum);
             var availablePackageHash = string.IsNullOrWhiteSpace(checksumUrl)
                 ? string.Empty
@@ -284,6 +291,12 @@ namespace GelitaITToolkit.Services
             asset.ValueKind == JsonValueKind.Object &&
             asset.TryGetProperty("browser_download_url", out var url)
                 ? url.GetString() ?? string.Empty
+                : string.Empty;
+
+        private static string GetAssetName(JsonElement asset) =>
+            asset.ValueKind == JsonValueKind.Object &&
+            asset.TryGetProperty("name", out var name)
+                ? name.GetString() ?? string.Empty
                 : string.Empty;
 
         private static string ExtractSha256(string text) =>
