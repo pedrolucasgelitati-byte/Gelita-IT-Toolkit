@@ -756,13 +756,69 @@ namespace GelitaITToolkit.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            var printersList = new CheckedListBox
+            var printersList = new DataGridView
             {
                 Name = "PrintersCheckedListBox",
                 Location = new Point(20, 30),
                 Size = new Size(910, 300),
                 Font = new Font("Segoe UI", 9),
-                CheckOnClick = true
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+                ColumnHeadersHeight = 34,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+                EnableHeadersVisualStyles = false,
+                MultiSelect = false,
+                RowHeadersVisible = false,
+                RowTemplate = { Height = 30 },
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
+            printersList.ColumnHeadersDefaultCellStyle.BackColor = GelitaNavy;
+            printersList.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            printersList.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            printersList.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 0, 0, 0);
+            printersList.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 235, 245);
+            printersList.DefaultCellStyle.SelectionForeColor = GelitaNavy;
+            printersList.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(247, 249, 251);
+            printersList.Columns.Add(new DataGridViewCheckBoxColumn
+            {
+                Name = "SelectedColumn",
+                HeaderText = string.Empty,
+                Width = 42,
+                FlatStyle = FlatStyle.Standard
+            });
+            printersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PrinterNameColumn",
+                HeaderText = "Impressora",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 45
+            });
+            printersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PrinterModelColumn",
+                HeaderText = "Modelo",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 35
+            });
+            printersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "PrinterStatusColumn",
+                HeaderText = "Status",
+                ReadOnly = true,
+                Width = 125
+            });
+            printersList.CellContentClick += (_, args) =>
+            {
+                if (args.RowIndex >= 0 && args.ColumnIndex == printersList.Columns["SelectedColumn"].Index)
+                    printersList.CommitEdit(DataGridViewDataErrorContexts.Commit);
             };
             listPanel.Controls.Add(printersList);
 
@@ -957,13 +1013,51 @@ namespace GelitaITToolkit.Forms
             unitCombo.SelectedIndexChanged += ScannersUnitComboBox_SelectedIndexChanged;
             addPanel.Controls.Add(unitCombo);
 
-            var printersList = new CheckedListBox
+            var printersList = new DataGridView
             {
                 Name = "ScannersPrintersCheckedListBox",
                 Location = new Point(20, 30),
                 Size = new Size(910, 210),
                 Font = new Font("Segoe UI", 9),
-                CheckOnClick = true
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                BackgroundColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersHeight = 32,
+                EnableHeadersVisualStyles = false,
+                RowHeadersVisible = false,
+                RowTemplate = { Height = 28 },
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
+            ApplyTableStyle(printersList);
+            printersList.Columns.Add(new DataGridViewCheckBoxColumn
+            {
+                Name = "ScannerPrinterSelectedColumn",
+                HeaderText = string.Empty,
+                Width = 42
+            });
+            printersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "ScannerPrinterNameColumn",
+                HeaderText = "Impressora",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 55
+            });
+            printersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "ScannerPrinterModelColumn",
+                HeaderText = "Modelo do scanner",
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 45
+            });
+            printersList.CellContentClick += (_, args) =>
+            {
+                if (args.RowIndex >= 0 && args.ColumnIndex == printersList.Columns["ScannerPrinterSelectedColumn"].Index)
+                    printersList.CommitEdit(DataGridViewDataErrorContexts.Commit);
             };
 
             var modelLabel = new Label
@@ -1041,14 +1135,44 @@ namespace GelitaITToolkit.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            var scannersList = new ListBox
+            var scannersList = new DataGridView
             {
                 Name = "ScannersListBox",
                 Location = new Point(20, 30),
                 Size = new Size(910, 250),
                 Font = new Font("Segoe UI", 9),
-                SelectionMode = SelectionMode.MultiExtended
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                AutoGenerateColumns = false,
+                BackgroundColor = Color.White,
+                CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+                ColumnHeadersHeight = 32,
+                EnableHeadersVisualStyles = false,
+                MultiSelect = true,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                RowTemplate = { Height = 28 },
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
             };
+            ApplyTableStyle(scannersList);
+            scannersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Scanner",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 40
+            });
+            scannersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Modelo",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                FillWeight = 40
+            });
+            scannersList.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Endereço IP",
+                Width = 155
+            });
             listPanel.Controls.Add(scannersList);
 
             tabPage.Controls.Add(listPanel);
@@ -2158,25 +2282,29 @@ namespace GelitaITToolkit.Forms
 
         private void PopulateScannersList(IEnumerable<Scanner> scanners)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
+            var scannersList = FindControl<DataGridView>("ScannersListBox");
             if (scannersList == null)
                 return;
 
-            scannersList.BeginUpdate();
-            scannersList.Items.Clear();
+            scannersList.SuspendLayout();
+            scannersList.Rows.Clear();
             foreach (var scanner in scanners)
-                scannersList.Items.Add(scanner);
-            scannersList.EndUpdate();
+            {
+                var rowIndex = scannersList.Rows.Add(scanner.Name, scanner.Model, scanner.IpAddress);
+                scannersList.Rows[rowIndex].Tag = scanner;
+            }
+            scannersList.ClearSelection();
+            scannersList.ResumeLayout();
         }
 
         private void ScannersUnitComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            var printersList = FindControl<CheckedListBox>("ScannersPrintersCheckedListBox");
+            var printersList = FindControl<DataGridView>("ScannersPrintersCheckedListBox");
             var unitName = FindControl<ComboBox>("ScannersUnitComboBox")?.SelectedItem?.ToString();
             if (printersList == null)
                 return;
 
-            printersList.Items.Clear();
+            printersList.Rows.Clear();
             if (!string.IsNullOrWhiteSpace(unitName) && _units.TryGetValue(unitName, out var unit))
             {
                 var printerOptions = unit.Printers
@@ -2186,9 +2314,13 @@ namespace GelitaITToolkit.Forms
                         PrinterName = printerName,
                         ScannerModel = unit.ScannerModels.TryGetValue(printerName, out var model) ? model : null
                     })
-                    .Cast<object>()
-                    .ToArray();
-                printersList.Items.AddRange(printerOptions);
+                    .ToList();
+                foreach (var option in printerOptions)
+                {
+                    var rowIndex = printersList.Rows.Add(false, option.PrinterName,
+                        option.ScannerModel ?? "Modelo não informado");
+                    printersList.Rows[rowIndex].Tag = option;
+                }
             }
         }
 
@@ -2739,26 +2871,33 @@ namespace GelitaITToolkit.Forms
         private async Task LoadPrintersForUnitAsync(string unitName)
         {
             var unit = _configService.GetUnit(unitName);
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             if (unit == null || printersList == null)
                 return;
 
             var printers = await _printerService.GetPrintersByUnit(unit);
             var installedPrinterNames = await Task.Run(_printerService.GetInstalledPrinterNames);
 
-            printersList.BeginUpdate();
+            printersList.SuspendLayout();
             try
             {
-                printersList.Items.Clear();
+                printersList.Rows.Clear();
                 foreach (var printer in printers)
                 {
                     printer.IsInstalled = _printerService.IsPrinterInstalled(printer.Name, installedPrinterNames);
-                    printersList.Items.Add(printer, false);
+                    var rowIndex = printersList.Rows.Add(false, printer.Name, printer.Model,
+                        printer.IsInstalled ? "Instalado" : "Ausente");
+                    var row = printersList.Rows[rowIndex];
+                    row.Tag = printer;
+                    row.Cells["PrinterStatusColumn"].Style.ForeColor = printer.IsInstalled
+                        ? Color.FromArgb(25, 120, 70)
+                        : Color.FromArgb(180, 65, 55);
+                    row.Cells["PrinterStatusColumn"].Style.Font = new Font("Segoe UI", 9, FontStyle.Bold);
                 }
             }
             finally
             {
-                printersList.EndUpdate();
+                printersList.ResumeLayout();
             }
 
             AddLog($"{printers.Count} impressora(s) carregada(s) para {unit.Name}.", LogLevel.Info);
@@ -2869,32 +3008,64 @@ namespace GelitaITToolkit.Forms
         private void PrintersSearchButton_Click(object sender, EventArgs e)
         {
             var searchBox = FindControl<TextBox>("PrintersSearchTextBox");
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             if (searchBox == null || printersList == null)
                 return;
 
             var query = searchBox.Text.Trim();
-            for (var index = 0; index < printersList.Items.Count; index++)
+            foreach (DataGridViewRow row in printersList.Rows)
             {
-                var printerName = printersList.Items[index]?.ToString() ?? string.Empty;
-                printersList.SetItemCheckState(index,
-                    string.IsNullOrWhiteSpace(query) || printerName.Contains(query, StringComparison.OrdinalIgnoreCase)
-                        ? CheckState.Checked
-                        : CheckState.Unchecked);
+                var printer = row.Tag as Printer;
+                row.Cells["SelectedColumn"].Value = string.IsNullOrWhiteSpace(query) ||
+                    (printer != null && (printer.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                         printer.Model.Contains(query, StringComparison.OrdinalIgnoreCase)));
             }
         }
+
+        private static List<Printer> GetCheckedPrinters(DataGridView printersList) =>
+            printersList.Rows.Cast<DataGridViewRow>()
+                .Where(row => Convert.ToBoolean(row.Cells["SelectedColumn"].Value))
+                .Select(row => row.Tag)
+                .OfType<Printer>()
+                .ToList();
+
+        private void ApplyTableStyle(DataGridView table)
+        {
+            table.BorderStyle = BorderStyle.FixedSingle;
+            table.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            table.ColumnHeadersDefaultCellStyle.BackColor = GelitaNavy;
+            table.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            table.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+            table.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 0, 0, 0);
+            table.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 235, 245);
+            table.DefaultCellStyle.SelectionForeColor = GelitaNavy;
+            table.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(247, 249, 251);
+        }
+
+        private static List<ScannerPrinterOption> GetCheckedScannerPrinterOptions(DataGridView printersList) =>
+            printersList.Rows.Cast<DataGridViewRow>()
+                .Where(row => Convert.ToBoolean(row.Cells["ScannerPrinterSelectedColumn"].Value))
+                .Select(row => row.Tag)
+                .OfType<ScannerPrinterOption>()
+                .ToList();
+
+        private static List<Scanner> GetSelectedScanners(DataGridView scannersList) =>
+            scannersList.SelectedRows.Cast<DataGridViewRow>()
+                .Select(row => row.Tag)
+                .OfType<Scanner>()
+                .ToList();
 
         private async void PrintersInstallButton_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (unit == null || printers.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var printers = printersList.CheckedItems.Cast<Printer>().ToList();
             var installed = await _printerService.InstallMultiplePrinters(printers);
             AddLog(installed ? "Impressoras instaladas com sucesso." : "Não foi possível instalar uma ou mais impressoras.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Impressoras instaladas com sucesso." : "Falha ao instalar uma ou mais impressoras.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
@@ -2917,20 +3088,21 @@ namespace GelitaITToolkit.Forms
         private async void PrintersRemoveButton_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (unit == null || printers.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var removed = printersList.CheckedItems.Count == printersList.Items.Count
+            var removed = printers.Count == printersList.Rows.Count
                 ? await _printerService.RemoveAllForUnit(unit)
                 : true;
 
-            if (printersList.CheckedItems.Count != printersList.Items.Count)
+            if (printers.Count != printersList.Rows.Count)
             {
-                foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+                foreach (var printer in printers)
                     removed &= await _printerService.RemovePrinter(printer.Name, unit);
             }
 
@@ -2947,15 +3119,16 @@ namespace GelitaITToolkit.Forms
         private async void PrintersPingButton_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (unit == null || selectedPrinters.Count == 0)
             {
                 MessageBox.Show("Selecione uma ou mais impressoras para testar o ping.", "Teste de Ping", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var results = new List<string>();
-            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            foreach (var printer in selectedPrinters)
             {
                 var printerName = printer.Name;
                 var ipAddress = GetScannerIpForPrinter(unit, printerName);
@@ -3019,15 +3192,16 @@ namespace GelitaITToolkit.Forms
         private async void PrintersPort9100Button_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (unit == null || selectedPrinters.Count == 0)
             {
                 MessageBox.Show("Selecione uma ou mais impressoras.", "Porta 9100", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var results = new List<string>();
-            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            foreach (var printer in selectedPrinters)
             {
                 var ipAddress = GetScannerIpForPrinter(unit, printer.Name);
                 if (string.IsNullOrWhiteSpace(ipAddress))
@@ -3072,14 +3246,15 @@ namespace GelitaITToolkit.Forms
 
         private Printer? GetSingleCheckedPrinter(string action)
         {
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (printersList == null || printersList.CheckedItems.Count != 1)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (printers.Count != 1)
             {
                 MessageBox.Show($"Marque exatamente uma impressora para {action}.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return null;
             }
 
-            return printersList.CheckedItems[0] as Printer;
+            return printers[0];
         }
 
         private async void PrintersAddButton_Click(object? sender, EventArgs e)
@@ -3106,12 +3281,14 @@ namespace GelitaITToolkit.Forms
         private void ScannersAddButton_Click(object sender, EventArgs e)
         {
             var modelCombo = FindControl<ComboBox>("ScannersModelComboBox");
-            var printersList = FindControl<CheckedListBox>("ScannersPrintersCheckedListBox");
+            var printersList = FindControl<DataGridView>("ScannersPrintersCheckedListBox");
             var ipBox = FindControl<TextBox>("ScannersIPTextBox");
             var unitName = FindControl<ComboBox>("ScannersUnitComboBox")?.SelectedItem?.ToString();
             var unit = !string.IsNullOrWhiteSpace(unitName) && _units.TryGetValue(unitName, out var selectedUnit) ? selectedUnit : null;
             var model = modelCombo?.SelectedItem?.ToString();
-            var printerOptions = printersList?.CheckedItems.Cast<ScannerPrinterOption>().ToList() ?? new List<ScannerPrinterOption>();
+            var printerOptions = printersList == null
+                ? new List<ScannerPrinterOption>()
+                : GetCheckedScannerPrinterOptions(printersList);
             var manualIpAddress = ipBox?.Text.Trim();
 
             if (unit == null || string.IsNullOrWhiteSpace(model) || printerOptions.Count == 0)
@@ -3189,8 +3366,8 @@ namespace GelitaITToolkit.Forms
 
         private void ScannersRemoveButton_Click(object sender, EventArgs e)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            var selectedScanners = scannersList?.SelectedItems.Cast<Scanner>().ToList() ?? new List<Scanner>();
+            var scannersList = FindControl<DataGridView>("ScannersListBox");
+            var selectedScanners = scannersList == null ? new List<Scanner>() : GetSelectedScanners(scannersList);
             if (selectedScanners.Count == 0)
             {
                 MessageBox.Show("Selecione um ou mais scanners na lista para remover.", "Remover Scanners", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -3269,8 +3446,9 @@ namespace GelitaITToolkit.Forms
 
         private async void ScannersPingButton_Click(object sender, EventArgs e)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList?.SelectedItem is not Scanner scanner)
+            var scannersList = FindControl<DataGridView>("ScannersListBox");
+            var scanner = scannersList == null ? null : GetSelectedScanners(scannersList).FirstOrDefault();
+            if (scanner == null)
             {
                 MessageBox.Show("Selecione um scanner na lista para testar o ping.", "Teste de Ping", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -4235,8 +4413,8 @@ namespace GelitaITToolkit.Forms
         private void ToolsValidateScannersButton_Click(object? sender, EventArgs e)
         {
             var scannerService = new ScannerService();
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            var scanners = scannersList?.SelectedItems.Cast<Scanner>().ToList();
+            var scannersList = FindControl<DataGridView>("ScannersListBox");
+            var scanners = scannersList == null ? null : GetSelectedScanners(scannersList);
             if (scanners == null || scanners.Count == 0)
                 scanners = scannerService.GetConfiguredEpsonScanners();
             if (scanners.Count == 0)
@@ -4258,12 +4436,15 @@ namespace GelitaITToolkit.Forms
 
         private async void ToolsRealScanTestButton_Click(object? sender, EventArgs e)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList?.SelectedItems.Count != 1 || scannersList.SelectedItem is not Scanner scanner)
+            var scannersList = FindControl<DataGridView>("ScannersListBox");
+            var selectedScanners = scannersList == null ? new List<Scanner>() : GetSelectedScanners(scannersList);
+            if (selectedScanners.Count != 1)
             {
                 MessageBox.Show("Selecione exatamente um scanner na aba Scanners.", "Digitalização Real", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
+
+            var scanner = selectedScanners[0];
 
             if (MessageBox.Show(
                     $"O NAPS2 iniciará uma digitalização real usando o perfil “{scanner.Name}”. Coloque uma folha no equipamento antes de continuar.",
@@ -4285,15 +4466,16 @@ namespace GelitaITToolkit.Forms
         private async void ToolsPrinterConnectivityButton_Click(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
+            var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
+            if (unit == null || selectedPrinters.Count == 0)
             {
                 MessageBox.Show("Selecione a unidade e uma ou mais impressoras na aba Impressoras.", "Conectividade", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var results = new List<string>();
-            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            foreach (var printer in selectedPrinters)
             {
                 var ip = GetScannerIpForPrinter(unit, printer.Name);
                 if (string.IsNullOrWhiteSpace(ip))

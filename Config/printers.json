@@ -7,16 +7,21 @@
       "scannerModels": {
         "MG_PRINTER_224": "Epson WF-M5899",
         "MG_PRINTER_225": "Epson WF-M5899",
-        "MG_PRINTER_226": "Epson WF-M5899",
-        "MG_PRINTER_227": "Epson WF-C5899",
-        "MG_PRINTER_230": "Epson WF-M5899",
+          "MG_PRINTER_226": "Epson WF-M5899",
+          "MG_PRINTER_227": "Epson WF-C5899",
+          "MG_PRINTER_228": "HP DesignJet T920",
+          "MG_PRINTER_230": "Epson WF-M5899",
         "MG_PRINTER_231": "Epson WF-M5899",
         "MG_PRINTER_232": "Epson WF-M5899",
         "MG_PRINTER_233": "Epson WF-M5899",
           "MG_PRINTER_235": "Epson WF-C5899",
           "MG_PRINTER_236": "Epson WF-M5899",
           "MG_PRINTER_237": "Epson WF-M5899",
-          "MG_PRINTER_241": "Epson WF-C5899"
+          "MG_PRINTER_238": "Epson WF-C5890",
+          "MG_PRINTER_240": "Zebra ZD230",
+          "MG_PRINTER_241": "Epson WF-C5899",
+          "MG_PRINTER_242": "Epson WF-C5890",
+          "MG_PRINTER_243": "Epson WF-C5890"
         },
         "scannerExcludedPrinters": [
           "MG_PRINTER_228",
