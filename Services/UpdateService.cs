@@ -17,6 +17,7 @@ namespace GelitaITToolkit.Services
 
     public sealed class UpdateService
     {
+        private const string PackageHashFileName = ".toolkit-package.sha256";
         private readonly HttpClient _httpClient;
 
         public UpdateService(HttpClient? httpClient = null)
@@ -49,9 +50,24 @@ namespace GelitaITToolkit.Services
             var assets = root.GetProperty("assets").EnumerateArray().ToList();
             var zip = assets.FirstOrDefault(asset =>
                 asset.GetProperty("name").GetString()?.EndsWith("-win-x64.zip", StringComparison.OrdinalIgnoreCase) == true);
+            var zipName = GetAssetName(zip);
             var checksum = assets.FirstOrDefault(asset =>
-                asset.GetProperty("name").GetString()?.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true ||
-                asset.GetProperty("name").GetString()?.EndsWith(".sha256.txt", StringComparison.OrdinalIgnoreCase) == true);
+                    string.Equals(GetAssetName(asset), zipName + ".sha256", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(GetAssetName(asset), zipName + ".sha256.txt", StringComparison.OrdinalIgnoreCase));
+            if (checksum.ValueKind != JsonValueKind.Object)
+            {
+                checksum = assets.FirstOrDefault(asset =>
+                    GetAssetName(asset).EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) ||
+                    GetAssetName(asset).EndsWith(".sha256.txt", StringComparison.OrdinalIgnoreCase));
+            }
+            var checksumUrl = GetAssetUrl(checksum);
+            var availablePackageHash = string.IsNullOrWhiteSpace(checksumUrl)
+                ? string.Empty
+                : ExtractSha256(await _httpClient.GetStringAsync(checksumUrl, cancellationToken));
+            var installedHashPath = Path.Combine(AppContext.BaseDirectory, PackageHashFileName);
+            var installedPackageHash = File.Exists(installedHashPath)
+                ? ExtractSha256(await File.ReadAllTextAsync(installedHashPath, cancellationToken))
+                : string.Empty;
 
             return new UpdateInfo
             {
@@ -59,7 +75,9 @@ namespace GelitaITToolkit.Services
                 AvailableVersion = available,
                 ReleaseUrl = root.GetProperty("html_url").GetString() ?? string.Empty,
                 DownloadUrl = GetAssetUrl(zip),
-                ChecksumUrl = GetAssetUrl(checksum)
+                ChecksumUrl = checksumUrl,
+                AvailablePackageHash = availablePackageHash,
+                InstalledPackageHash = installedPackageHash
             };
         }
 
@@ -75,9 +93,7 @@ namespace GelitaITToolkit.Services
             var fileName = Path.GetFileName(new Uri(update.DownloadUrl).AbsolutePath);
             var destination = Path.Combine(destinationDirectory, fileName);
             var checksumText = await _httpClient.GetStringAsync(update.ChecksumUrl, cancellationToken);
-            var expectedHash = checksumText
-                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-                .FirstOrDefault(value => value.Length == 64 && value.All(Uri.IsHexDigit));
+            var expectedHash = ExtractSha256(checksumText);
             if (string.IsNullOrWhiteSpace(expectedHash))
                 throw new InvalidDataException("O arquivo de checksum não contém um SHA-256 válido.");
 
@@ -127,6 +143,13 @@ namespace GelitaITToolkit.Services
             if (!Version.TryParse(fileVersion, out var packagedVersion) || packagedVersion < targetVersion)
                 throw new InvalidDataException(
                     $"A versão do executável no pacote ({fileVersion ?? "não identificada"}) é inferior à versão anunciada ({targetVersion}).");
+
+            var packageHash = SecurityHelper.CalculateSha256(validatedZipPath);
+            await File.WriteAllTextAsync(
+                Path.Combine(payloadDirectory, PackageHashFileName),
+                packageHash + Environment.NewLine,
+                new UTF8Encoding(false),
+                cancellationToken);
 
             var scriptPath = Path.Combine(updateRoot, "Apply-ToolkitUpdate.ps1");
             await File.WriteAllTextAsync(scriptPath, BuildUpdaterScript(), new UTF8Encoding(false), cancellationToken);
@@ -269,5 +292,16 @@ namespace GelitaITToolkit.Services
             asset.TryGetProperty("browser_download_url", out var url)
                 ? url.GetString() ?? string.Empty
                 : string.Empty;
+
+        private static string GetAssetName(JsonElement asset) =>
+            asset.ValueKind == JsonValueKind.Object &&
+            asset.TryGetProperty("name", out var name)
+                ? name.GetString() ?? string.Empty
+                : string.Empty;
+
+        private static string ExtractSha256(string text) =>
+            text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault(value => value.Length == 64 && value.All(Uri.IsHexDigit))
+            ?? string.Empty;
     }
 }

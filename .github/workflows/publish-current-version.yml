@@ -1,0 +1,75 @@
+name: Publicar pacote da versão atual
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Ler versão atual
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content Gelita-IT-Toolkit.csproj
+          $version = ($project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1)
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Versão não encontrada no projeto.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Compilar pacote portátil
+        shell: pwsh
+        run: |
+          dotnet publish .\Gelita-IT-Toolkit.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o .\publish
+
+      - name: Gerar ZIP e SHA-256
+        id: package
+        shell: pwsh
+        run: |
+          $baseName = "Gelita-IT-Toolkit-v${{ steps.version.outputs.version }}-win-x64"
+          $zipPath = Join-Path $PWD "$baseName.zip"
+          $hashPath = Join-Path $PWD "$baseName.zip.sha256"
+          Compress-Archive -Path .\publish\* -DestinationPath $zipPath -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
+          "$hash  $baseName.zip" | Set-Content -LiteralPath $hashPath -Encoding ascii
+          "zip=$zipPath" >> $env:GITHUB_OUTPUT
+          "hash=$hashPath" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar na release da versão atual
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target "${{ github.sha }}" --title $tag --notes "Pacote automático da versão atual."
+          }
+          gh release upload $tag "${{ steps.package.outputs.zip }}" "${{ steps.package.outputs.hash }}" --clobber

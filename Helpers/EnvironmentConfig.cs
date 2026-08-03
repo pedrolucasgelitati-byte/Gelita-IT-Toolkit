@@ -1,6 +1,7 @@
 namespace GelitaITToolkit.Helpers
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text.RegularExpressions;
     using System.Text.Json;
@@ -21,11 +22,7 @@ namespace GelitaITToolkit.Helpers
                 if (_loaded)
                     return;
 
-                foreach (var path in new[]
-                         {
-                             Path.Combine(AppContext.BaseDirectory, ".env"),
-                             Path.Combine(Environment.CurrentDirectory, ".env")
-                         })
+                foreach (var path in GetEnvironmentFileCandidates())
                 {
                     if (!File.Exists(path))
                         continue;
@@ -35,6 +32,23 @@ namespace GelitaITToolkit.Helpers
                 }
 
                 _loaded = true;
+            }
+        }
+
+        private static IEnumerable<string> GetEnvironmentFileCandidates()
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var startPath in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
+            {
+                var directory = new DirectoryInfo(startPath);
+                while (directory != null)
+                {
+                    var candidate = Path.Combine(directory.FullName, ".env");
+                    if (visited.Add(candidate))
+                        yield return candidate;
+
+                    directory = directory.Parent;
+                }
             }
         }
 
