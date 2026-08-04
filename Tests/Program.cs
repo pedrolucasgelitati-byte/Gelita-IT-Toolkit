@@ -19,6 +19,12 @@ AssertEqual("Epson WF-C5890", maringa.PrinterModels["MG_PRINTER_238"], "modelo d
 AssertEqual("Zebra ZD230", maringa.PrinterModels["MG_PRINTER_240"], "modelo da 240");
 AssertEqual("Epson WF-C5890", maringa.PrinterModels["MG_PRINTER_242"], "modelo da 242");
 AssertEqual("Epson WF-C5890", maringa.PrinterModels["MG_PRINTER_243"], "modelo da 243");
+
+var createEpsonDevice = typeof(ScannerService).GetMethod(
+    "CreateEpsonDeviceDefinition",
+    BindingFlags.NonPublic | BindingFlags.Static)
+    ?? throw new InvalidOperationException("Gerador de definição Epson não encontrado.");
+Assert(createEpsonDevice.Invoke(null, new object[] { "Epson WF-C5890" }) != null, "O scanner WF-C5890 deve ser suportado.");
 Assert(!maringa.ScannerModels.ContainsKey("MG_PRINTER_228"), "A HP 228 não pode ser scanner Epson.");
 Assert(!maringa.ScannerModels.ContainsKey("MG_PRINTER_240"), "A Zebra 240 não pode ser scanner Epson.");
 

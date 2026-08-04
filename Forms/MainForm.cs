@@ -1077,7 +1077,7 @@ namespace GelitaITToolkit.Forms
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Font = new Font("Segoe UI", 9)
             };
-            modelCombo.Items.AddRange(new[] { "Epson WF-C5899", "Epson WF-M5899", "Outros" });
+            modelCombo.Items.AddRange(new[] { "Epson WF-C5890", "Epson WF-C5899", "Epson WF-M5899", "Outros" });
             modelCombo.SelectedIndex = 0;
             addPanel.Controls.Add(modelCombo);
 
