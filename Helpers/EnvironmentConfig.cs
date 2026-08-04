@@ -41,11 +41,16 @@ namespace GelitaITToolkit.Helpers
             foreach (var startPath in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
             {
                 var directory = new DirectoryInfo(startPath);
-                while (directory != null)
+                for (var level = 0; directory != null && level < 8; level++)
                 {
                     var candidate = Path.Combine(directory.FullName, ".env");
                     if (visited.Add(candidate))
                         yield return candidate;
+
+                    // No repositório, a busca termina assim que alcança a raiz do projeto.
+                    // Em instalações portáteis, o .env deve ficar ao lado do executável.
+                    if (File.Exists(Path.Combine(directory.FullName, "Gelita-IT-Toolkit.csproj")))
+                        break;
 
                     directory = directory.Parent;
                 }

@@ -12,13 +12,13 @@ namespace GelitaITToolkit.Models
         /// Obtém ou define o nome da unidade da Gelita.
         /// </summary>
         [JsonPropertyName("name")]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define o caminho do servidor de impressão da unidade.
         /// </summary>
         [JsonPropertyName("printServer")]
-        public string PrintServer { get; set; }
+        public string PrintServer { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define a lista de impressoras configuradas para esta unidade.
@@ -34,6 +34,10 @@ namespace GelitaITToolkit.Models
         [JsonPropertyName("scannerModels")]
         public Dictionary<string, string> ScannerModels { get; set; }
 
+        /// <summary>Modelos de impressora conhecidos, indexados pelo nome da fila.</summary>
+        [JsonPropertyName("printerModels")]
+        public Dictionary<string, string> PrinterModels { get; set; }
+
         /// <summary>Filas que não possuem scanner e não devem aparecer na aba Scanners.</summary>
         [JsonPropertyName("scannerExcludedPrinters")]
         public List<string> ScannerExcludedPrinters { get; set; }
@@ -45,6 +49,7 @@ namespace GelitaITToolkit.Models
         {
             Printers = new List<string>();
             ScannerModels = new Dictionary<string, string>();
+            PrinterModels = new Dictionary<string, string>();
             ScannerExcludedPrinters = new List<string>();
         }
 
@@ -54,12 +59,13 @@ namespace GelitaITToolkit.Models
         /// <param name="name">O nome da unidade.</param>
         /// <param name="printServer">O servidor de impressão.</param>
         /// <param name="printers">A lista de impressoras.</param>
-        public Unit(string name, string printServer, List<string> printers = null)
+        public Unit(string name, string printServer, List<string>? printers = null)
         {
             Name = name;
             PrintServer = printServer;
             Printers = printers ?? new List<string>();
             ScannerModels = new Dictionary<string, string>();
+            PrinterModels = new Dictionary<string, string>();
             ScannerExcludedPrinters = new List<string>();
         }
     }

@@ -35,6 +35,10 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version" >> $env:GITHUB_OUTPUT
 
+      - name: Executar smoke tests
+        shell: pwsh
+        run: dotnet run --project .\Tests\Gelita-IT-Toolkit.SmokeTests.csproj -c Release
+
       - name: Compilar pacote portátil
         shell: pwsh
         run: |
@@ -47,6 +51,47 @@ jobs:
             -p:DebugType=None `
             -p:DebugSymbols=false `
             -o .\publish
+
+      - name: Assinar executável (quando configurado)
+        shell: pwsh
+        env:
+          SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERTIFICATE_BASE64)) {
+            Write-Host 'Certificado de assinatura não configurado; etapa ignorada.'
+            exit 0
+          }
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'gelita-toolkit-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:SIGNING_CERTIFICATE_BASE64))
+          $password = ConvertTo-SecureString $env:SIGNING_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          $signature = Set-AuthenticodeSignature -FilePath .\publish\Gelita-IT-Toolkit.exe -Certificate $certificate -TimestampServer 'http://timestamp.digicert.com' -HashAlgorithm SHA256
+          if ($signature.Status -ne 'Valid') { throw "Falha ao assinar o executável: $($signature.StatusMessage)" }
+          Remove-Item -LiteralPath $certificatePath -Force
+
+      - name: Validar conteúdo do pacote
+        shell: pwsh
+        run: |
+          $requiredPaths = @(
+            '.\publish\Gelita-IT-Toolkit.exe',
+            '.\publish\Config\printers.json',
+            '.\publish\Config\toolkit-settings.json',
+            '.\publish\Assets',
+            '.\publish\LEIA-ME.txt',
+            '.\publish\Abrir-Gelita-IT-Toolkit.cmd'
+          )
+          foreach ($path in $requiredPaths) {
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "Arquivo obrigatório ausente do pacote: $path"
+            }
+          }
+          if (Test-Path -LiteralPath '.\publish\.env') {
+            throw 'O arquivo .env local não pode ser incluído na release.'
+          }
+          Get-ChildItem .\publish\Config\*.json | ForEach-Object {
+            Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json | Out-Null
+          }
 
       - name: Gerar ZIP e SHA-256
         id: package

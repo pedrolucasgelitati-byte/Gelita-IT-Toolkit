@@ -106,9 +106,11 @@ namespace GelitaITToolkit.Services
                     if (template.Device != null && template.Parent != null)
                     {
                         device = template.Device.DeepClone() as JsonObject;
-                        scannerGroups.Add(new JsonArray(device));
+                        if (device != null)
+                            scannerGroups.Add(new JsonArray(device));
                     }
-                    else
+
+                    if (device == null)
                     {
                         device = CreateEpsonDeviceDefinition(scanner.Model);
                         var configuredDeviceList = (root as JsonObject)?["DeviceList"] as JsonArray;
@@ -321,7 +323,7 @@ namespace GelitaITToolkit.Services
 
         private static JsonObject? CreateEpsonDeviceDefinition(string model)
         {
-            if (model.Contains("C5899", StringComparison.OrdinalIgnoreCase))
+            if (IsEpsonColorScannerModel(model))
             {
                 return CreateDevice(
                     "ES0269", "11B6", "ES0269", "EPSON WF-C5810/C5890 Series",
@@ -421,12 +423,16 @@ namespace GelitaITToolkit.Services
 
         private static (JsonArray? Parent, JsonObject? Device) FindDeviceTemplate(JsonNode? node, string model)
         {
-            var scannerId = model.Contains("C5899", StringComparison.OrdinalIgnoreCase) ? "ES0269"
+            var scannerId = IsEpsonColorScannerModel(model) ? "ES0269"
                 : model.Contains("M5899", StringComparison.OrdinalIgnoreCase) ? "ES0288"
                 : string.Empty;
 
             return FindDeviceTemplateByScannerId(node, scannerId);
         }
+
+        private static bool IsEpsonColorScannerModel(string model) =>
+            model.Contains("C5890", StringComparison.OrdinalIgnoreCase) ||
+            model.Contains("C5899", StringComparison.OrdinalIgnoreCase);
 
         private static (JsonArray? Parent, JsonObject? Device) FindDeviceTemplateByScannerId(JsonNode? node, string scannerId)
         {

@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 1.0.4 — 2026-08-04
+
+- Corrige o suporte à configuração dos scanners Epson WF-C5890.
+- Separa os modelos de impressora dos modelos de scanner nas configurações.
+- Atualiza os modelos das filas de Maringá, incluindo HP DesignJet T920 e Zebra ZD230.
+- Detecta atualizações pelo conteúdo do pacote mesmo sem alteração de versão.
+- Preserva o arquivo `.env` durante atualizações automáticas.
+- Adiciona diagnóstico de configuração, validações e smoke tests no GitHub Actions.
+- Melhora a visualização das telas de impressoras e scanners.
+
 ## 1.0.3 — 2026-07-30
 
 - Seleção independente das contas CitrixBR e CitrixEB.
