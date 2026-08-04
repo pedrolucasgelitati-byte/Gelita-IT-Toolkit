@@ -2066,7 +2066,7 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 1.0.3",
+                Text = $"Versão: {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -2990,7 +2990,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 1.0.3\n\n" +
+                $"Versão {System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)}\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",

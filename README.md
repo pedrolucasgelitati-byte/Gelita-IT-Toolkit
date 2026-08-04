@@ -2,7 +2,7 @@
 
 Ferramenta interna e portátil do Service Desk da Gelita para preparar, configurar, diagnosticar e reparar computadores Windows.
 
-**Versão atual:** 1.0.3
+**Versão atual:** 1.0.4
 **Plataforma:** Windows x64
 **Tecnologia:** .NET 8 e Windows Forms
 
@@ -214,7 +214,7 @@ dotnet publish .\Gelita-IT-Toolkit.csproj `
   -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:DebugType=None `
   -p:DebugSymbols=false `
-  -o .\dist\Gelita-IT-Toolkit-v1.0.3-win-x64
+  -o .\dist\Gelita-IT-Toolkit-v1.0.4-win-x64
 ```
 
 Antes de distribuir:
