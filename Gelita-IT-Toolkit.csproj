@@ -43,9 +43,10 @@
 
   <!-- Recursos Embed -->
   <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
     <None Update="Config\*.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
     <None Update="Assets\**\*">

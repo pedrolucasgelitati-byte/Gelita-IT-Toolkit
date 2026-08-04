@@ -138,6 +138,9 @@ arquivo `.env` durante a inicialização. Copie `.env.example` para `.env`, pree
 os valores corporativos e nunca envie o `.env` ao Git. Variáveis definidas
 diretamente no Windows têm prioridade sobre o arquivo.
 
+Recursos que dependem de variáveis opcionais, como contas Citrix, permanecem
+desabilitados quando não estão configurados sem impedir a abertura do Toolkit.
+
 Depois de alterar um JSON, use a validação e o recarregamento disponíveis no programa. Um JSON inválido não deve ser distribuído.
 
 ### Caminhos padrão importantes
@@ -236,10 +239,18 @@ O botão de atualização baixa e substitui o programa completo, incluindo os ar
 6. Substitui os arquivos e abre a nova versão.
 7. Restaura o backup automaticamente se a atualização falhar.
 
+O arquivo `.env` local é copiado da instalação anterior para a nova. Ele não é
+incluído no pacote publicado e não é enviado ao GitHub.
+
 Além do número da versão, o Toolkit compara o SHA-256 do pacote publicado com o
 pacote instalado. Assim, uma correção publicada na mesma versão também é
 oferecida como atualização. O workflow `publish-current-version.yml` recompila e
 substitui os arquivos da release atual a cada push na branch `main`.
+
+A consulta por atualizações também ocorre silenciosamente ao iniciar, sem impedir
+o uso do programa quando a rede ou o GitHub estiverem indisponíveis. A assinatura
+do executável pode ser habilitada no GitHub Actions pelos secrets
+`WINDOWS_SIGNING_CERTIFICATE_BASE64` e `WINDOWS_SIGNING_CERTIFICATE_PASSWORD`.
 
 Se o repositório for privado, a API do GitHub pode responder **404 (Not Found)** em máquinas sem autenticação. O Toolkit pode usar um token somente de leitura fornecido pela variável de ambiente:
 

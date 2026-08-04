@@ -11,31 +11,31 @@ namespace GelitaITToolkit.Models
         /// Obtém ou define o nome amigável da impressora.
         /// </summary>
         [JsonPropertyName("name")]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define o servidor de impressão no qual a impressora está configurada.
         /// </summary>
         [JsonPropertyName("server")]
-        public string Server { get; set; }
+        public string Server { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define o nome do compartilhamento da impressora na rede.
         /// </summary>
         [JsonPropertyName("share")]
-        public string Share { get; set; }
+        public string Share { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define a unidade da Gelita à qual a impressora pertence.
         /// </summary>
         [JsonPropertyName("unit")]
-        public string Unit { get; set; }
+        public string Unit { get; set; } = string.Empty;
 
         /// <summary>
         /// Obtém ou define o modelo da impressora (ex: Epson, HP, Brother).
         /// </summary>
         [JsonPropertyName("model")]
-        public string Model { get; set; }
+        public string Model { get; set; } = string.Empty;
 
         [JsonIgnore]
         public bool IsInstalled { get; set; }

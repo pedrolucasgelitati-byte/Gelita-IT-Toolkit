@@ -105,12 +105,12 @@ namespace GelitaITToolkit.Forms
         /// <summary>
         /// TabControl que organiza as abas da interface.
         /// </summary>
-        private TabControl _tabControl;
+        private TabControl _tabControl = null!;
 
         /// <summary>
         /// RichTextBox para exibição de logs.
         /// </summary>
-        private RichTextBox _logsRichTextBox;
+        private RichTextBox _logsRichTextBox = null!;
         private CheckedListBox _citrixStoresCheckedListBox = null!;
         private bool _isConfiguringCitrix;
         private SplitContainer _navigationContainer = null!;
@@ -1475,21 +1475,25 @@ namespace GelitaITToolkit.Forms
                 BorderStyle = BorderStyle.FixedSingle,
                 Font = new Font("Segoe UI", 9)
             };
-            _citrixStoresCheckedListBox.Items.AddRange(new object[]
+            var configuredCitrixStores = new[]
             {
                 new CitrixStoreOption
                 {
-                    Name = "CitrixBRInternal",
-                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_BR_DISCOVERY_URL"),
+                    Name = EnvironmentConfig.Get("GELITA_CITRIX_BR_NAME", "CitrixBRInternal"),
+                    DiscoveryUrl = EnvironmentConfig.Get("GELITA_CITRIX_BR_DISCOVERY_URL"),
                     IsPrimary = true
                 },
                 new CitrixStoreOption
                 {
-                    Name = "CitrixEB",
-                    DiscoveryUrl = EnvironmentConfig.GetRequired("GELITA_CITRIX_EB_DISCOVERY_URL")
+                    Name = EnvironmentConfig.Get("GELITA_CITRIX_EB_NAME", "CitrixEB"),
+                    DiscoveryUrl = EnvironmentConfig.Get("GELITA_CITRIX_EB_DISCOVERY_URL")
                 }
-            });
-            _citrixStoresCheckedListBox.SetItemChecked(0, true);
+            }
+                .Where(store => !string.IsNullOrWhiteSpace(store.DiscoveryUrl))
+                .ToArray();
+            _citrixStoresCheckedListBox.Items.AddRange(configuredCitrixStores);
+            if (_citrixStoresCheckedListBox.Items.Count > 0)
+                _citrixStoresCheckedListBox.SetItemChecked(0, true);
             storeGroup.Controls.Add(_citrixStoresCheckedListBox);
 
             storeGroup.Controls.Add(new Label
@@ -1528,10 +1532,17 @@ namespace GelitaITToolkit.Forms
                 BackColor = GelitaNavy,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Enabled = configuredCitrixStores.Length > 0
             };
             addStoreButton.Click += CitrixAddStoreButton_Click;
             storeGroup.Controls.Add(addStoreButton);
+
+            if (configuredCitrixStores.Length == 0)
+            {
+                storeUrlTextBox.Text = "Nenhuma conta Citrix configurada no ambiente local.";
+                storeUrlTextBox.ForeColor = Color.DimGray;
+            }
 
             var openWorkspaceButton = new Button
             {
@@ -2149,13 +2160,14 @@ namespace GelitaITToolkit.Forms
         /// Evento acionado quando o formulário é carregado.
         /// Carrega as unidades e scanners do arquivo de configuração.
         /// </summary>
-        private async void MainForm_Load(object sender, EventArgs e)
+        private async void MainForm_Load(object? sender, EventArgs e)
         {
             try
             {
                 await LoadConfigurationAsync();
                 UpdateStatusLabel("Aplicação inicializada com sucesso");
                 AddLog("Interface carregada - Sistema pronto", LogLevel.Info);
+                _ = CheckForToolkitUpdatesSilentlyAsync();
             }
             catch (Exception ex)
             {
@@ -2172,7 +2184,7 @@ namespace GelitaITToolkit.Forms
         /// Evento acionado quando o formulário é fechado.
         /// Realiza limpeza de recursos.
         /// </summary>
-        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        private void MainForm_FormClosed(object? sender, FormClosedEventArgs e)
         {
             AddLog("Aplicação encerrada", LogLevel.Info);
         }
@@ -2205,10 +2217,7 @@ namespace GelitaITToolkit.Forms
                 if (_units.Count > 0)
                 {
                     // Popular ComboBox de Impressoras
-                    var printersUnitCombo = _tabControl.TabPages["PrintersTab"].Controls.Cast<Control>()
-                        .OfType<GroupBox>().First()
-                        .Controls.Cast<Control>()
-                        .OfType<ComboBox>().FirstOrDefault();
+                    var printersUnitCombo = FindControl<ComboBox>("PrintersUnitComboBox");
 
                     if (printersUnitCombo != null)
                     {
@@ -2330,7 +2339,9 @@ namespace GelitaITToolkit.Forms
             if (!int.TryParse(numberPart, out var printerNumber))
                 return null;
 
-            var range = unit.PrinterIpRange.Trim();
+            var range = unit.PrinterIpRange?.Trim();
+            if (string.IsNullOrWhiteSpace(range))
+                return null;
             var firstAddress = range
                 .Split(new[] { '/', '-', ' ' }, StringSplitOptions.RemoveEmptyEntries)
                 .FirstOrDefault();
@@ -2389,11 +2400,11 @@ namespace GelitaITToolkit.Forms
             SetAnchor("SettingsStatusRichTextBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
             SetAnchor("LogsRichTextBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
 
-            var toolsPanel = _tabControl.TabPages["ToolsTab"].Controls.OfType<GroupBox>().FirstOrDefault();
+            var toolsPanel = _tabControl.TabPages["ToolsTab"]?.Controls.OfType<GroupBox>().FirstOrDefault();
             if (toolsPanel?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault() is { } toolsFlow)
                 toolsFlow.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
-            var aboutPanel = _tabControl.TabPages["AboutTab"].Controls.OfType<GroupBox>().FirstOrDefault();
+            var aboutPanel = _tabControl.TabPages["AboutTab"]?.Controls.OfType<GroupBox>().FirstOrDefault();
             if (aboutPanel?.Controls.OfType<RichTextBox>().FirstOrDefault() is { } aboutText)
                 aboutText.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
@@ -2428,7 +2439,7 @@ namespace GelitaITToolkit.Forms
 
         private void SetGroupAnchor(string tabName, string groupText, AnchorStyles anchor)
         {
-            var group = _tabControl.TabPages[tabName].Controls.OfType<GroupBox>()
+            var group = _tabControl.TabPages[tabName]?.Controls.OfType<GroupBox>()
                 .FirstOrDefault(control => control.Text == groupText);
             if (group != null)
                 group.Anchor = anchor;
@@ -2436,7 +2447,7 @@ namespace GelitaITToolkit.Forms
 
         private void SetFlowAnchor(string tabName, AnchorStyles anchor)
         {
-            var flow = _tabControl.TabPages[tabName].Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+            var flow = _tabControl.TabPages[tabName]?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
             if (flow != null)
                 flow.Anchor = anchor;
         }
@@ -3005,7 +3016,7 @@ namespace GelitaITToolkit.Forms
             await LoadPrintersForUnitAsync(unitName);
         }
 
-        private void PrintersSearchButton_Click(object sender, EventArgs e)
+        private void PrintersSearchButton_Click(object? sender, EventArgs e)
         {
             var searchBox = FindControl<TextBox>("PrintersSearchTextBox");
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
@@ -3060,7 +3071,7 @@ namespace GelitaITToolkit.Forms
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
-            if (unit == null || printers.Count == 0)
+            if (unit == null || printersList == null || printers.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -3090,7 +3101,7 @@ namespace GelitaITToolkit.Forms
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
-            if (unit == null || printers.Count == 0)
+            if (unit == null || printersList == null || printers.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -3278,7 +3289,7 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA SCANNERS ====
 
-        private void ScannersAddButton_Click(object sender, EventArgs e)
+        private void ScannersAddButton_Click(object? sender, EventArgs e)
         {
             var modelCombo = FindControl<ComboBox>("ScannersModelComboBox");
             var printersList = FindControl<DataGridView>("ScannersPrintersCheckedListBox");
@@ -3364,7 +3375,7 @@ namespace GelitaITToolkit.Forms
             MessageBox.Show(message, "Adicionar Scanners", MessageBoxButtons.OK, failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private void ScannersRemoveButton_Click(object sender, EventArgs e)
+        private void ScannersRemoveButton_Click(object? sender, EventArgs e)
         {
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var selectedScanners = scannersList == null ? new List<Scanner>() : GetSelectedScanners(scannersList);
@@ -3444,7 +3455,7 @@ namespace GelitaITToolkit.Forms
                 epsonSuccess && naps2Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void ScannersPingButton_Click(object sender, EventArgs e)
+        private async void ScannersPingButton_Click(object? sender, EventArgs e)
         {
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var scanner = scannersList == null ? null : GetSelectedScanners(scannersList).FirstOrDefault();
@@ -4635,7 +4646,28 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private void ToolsPrinterMgmtButton_Click(object sender, EventArgs e)
+        private async Task CheckForToolkitUpdatesSilentlyAsync()
+        {
+            try
+            {
+                var update = await new UpdateService().CheckAsync();
+                if (!update.UpdateAvailable)
+                    return;
+
+                UpdateStatusLabel($"Atualização {update.AvailableVersion} disponível");
+                AddLog(
+                    $"Atualização disponível: versão {update.AvailableVersion}; " +
+                    $"conteúdo {(update.PackageChanged ? "alterado" : "não alterado")}.",
+                    LogLevel.Info);
+            }
+            catch (Exception ex)
+            {
+                // A consulta automática nunca deve impedir o uso do Toolkit.
+                AddLog($"Verificação automática de atualização indisponível: {ex.Message}", LogLevel.Warning);
+            }
+        }
+
+        private void ToolsPrinterMgmtButton_Click(object? sender, EventArgs e)
         {
             Process.Start(new ProcessStartInfo
             {
@@ -4646,7 +4678,7 @@ namespace GelitaITToolkit.Forms
             AddLog("Dispositivos e Impressoras aberto.", LogLevel.Info);
         }
 
-        private void ToolsDeviceMgmtButton_Click(object sender, EventArgs e)
+        private void ToolsDeviceMgmtButton_Click(object? sender, EventArgs e)
         {
             Process.Start(new ProcessStartInfo { FileName = "devmgmt.msc", UseShellExecute = true });
             AddLog("Gerenciador de Dispositivos aberto.", LogLevel.Info);
@@ -4909,7 +4941,7 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async void ToolsPortTesterButton_Click(object sender, EventArgs e)
+        private async void ToolsPortTesterButton_Click(object? sender, EventArgs e)
         {
             var host = PromptForText("Testador de Porta", "Informe o IP ou nome do computador/impressora:");
             if (string.IsNullOrWhiteSpace(host))
@@ -4964,9 +4996,23 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA CONFIGURAÇÕES ====
 
-        private async void SettingsReloadButton_Click(object sender, EventArgs e)
+        private async void SettingsReloadButton_Click(object? sender, EventArgs e)
         {
             var statusTextBox = FindControl<RichTextBox>("SettingsStatusRichTextBox");
+            var missingVariables = _configService.GetMissingEnvironmentVariables();
+            if (missingVariables.Count > 0)
+            {
+                if (statusTextBox != null)
+                {
+                    statusTextBox.ForeColor = Color.DarkOrange;
+                    statusTextBox.Text =
+                        "Variáveis obrigatórias ausentes no Windows ou no arquivo .env:\n• " +
+                        string.Join("\n• ", missingVariables);
+                }
+                AddLog($"Configuração incompleta: {string.Join(", ", missingVariables)}", LogLevel.Warning);
+                return;
+            }
+
             var errors = _configService.ValidateConfigurationFiles();
             if (errors.Count > 0)
             {
@@ -5007,7 +5053,7 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private void SettingsOpenFolderButton_Click(object sender, EventArgs e)
+        private void SettingsOpenFolderButton_Click(object? sender, EventArgs e)
         {
             var configDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
             try
@@ -5060,7 +5106,7 @@ namespace GelitaITToolkit.Forms
             LoadExecutionHistory((sender as TextBox)?.Text.Trim());
         }
 
-        private void LogsClearButton_Click(object sender, EventArgs e)
+        private void LogsClearButton_Click(object? sender, EventArgs e)
         {
             if (MessageBox.Show("Tem certeza de que deseja limpar os logs?", "Confirmar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
@@ -5069,7 +5115,7 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private void LogsExportButton_Click(object sender, EventArgs e)
+        private void LogsExportButton_Click(object? sender, EventArgs e)
         {
             // Stub: Será implementado na Fase 4
             AddLog("Exportação de logs - Não implementado", LogLevel.Info);

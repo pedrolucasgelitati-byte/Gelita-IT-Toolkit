@@ -4,6 +4,7 @@ namespace GelitaITToolkit.Services
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text.RegularExpressions;
     using System.Text.Json;
     using System.Windows.Forms;
     using GelitaITToolkit.Helpers;
@@ -27,8 +28,7 @@ namespace GelitaITToolkit.Services
         /// </summary>
         public ConfigService()
         {
-            // Define caminho da pasta Config (raiz do projeto)
-            _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
+            _configPath = ResolveConfigPath();
 
             // Cria pasta Config se não existir
             if (!Directory.Exists(_configPath))
@@ -47,6 +47,21 @@ namespace GelitaITToolkit.Services
             _unitsCache = new Dictionary<string, Unit>();
             _printersCache = new List<Printer>();
             _scannersCache = new List<Scanner>();
+        }
+
+        private static string ResolveConfigPath()
+        {
+            var baseDirectory = new DirectoryInfo(AppContext.BaseDirectory);
+            var directory = baseDirectory;
+            for (var level = 0; directory != null && level < 8; level++)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "Gelita-IT-Toolkit.csproj")))
+                    return Path.Combine(directory.FullName, "Config");
+
+                directory = directory.Parent;
+            }
+
+            return Path.Combine(baseDirectory.FullName, "Config");
         }
 
         /// <summary>
@@ -202,6 +217,23 @@ namespace GelitaITToolkit.Services
             return errors;
         }
 
+        public List<string> GetMissingEnvironmentVariables()
+        {
+            EnvironmentConfig.Load();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in Directory.EnumerateFiles(_configPath, "*.json"))
+            {
+                var content = File.ReadAllText(path);
+                foreach (Match match in Regex.Matches(content, @"\$\{([A-Za-z_][A-Za-z0-9_]*)\}"))
+                    names.Add(match.Groups[1].Value);
+            }
+
+            return names
+                .Where(name => string.IsNullOrWhiteSpace(EnvironmentConfig.Get(name)))
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private void ValidateSecurityPolicy(List<string> errors)
         {
             var path = Path.Combine(_configPath, "security-policy.json");
@@ -259,6 +291,17 @@ namespace GelitaITToolkit.Services
                         errors.Add($"A unidade {unit?.Name ?? "sem nome"} não possui impressoras.");
                     else if (unit.Printers.Count != unit.Printers.Distinct(StringComparer.OrdinalIgnoreCase).Count())
                         errors.Add($"A unidade {unit.Name} possui impressoras duplicadas.");
+
+                    if (unit != null)
+                    {
+                        var queues = unit.Printers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        foreach (var queue in unit.PrinterModels.Keys.Where(queue => !queues.Contains(queue)))
+                            errors.Add($"O modelo de impressora '{queue}' da unidade {unit.Name} não pertence à lista de impressoras.");
+                        foreach (var queue in unit.ScannerModels.Keys.Where(queue => !queues.Contains(queue)))
+                            errors.Add($"O modelo de scanner '{queue}' da unidade {unit.Name} não pertence à lista de impressoras.");
+                        foreach (var queue in unit.ScannerExcludedPrinters.Where(queue => !queues.Contains(queue)))
+                            errors.Add($"A exclusão de scanner '{queue}' da unidade {unit.Name} não pertence à lista de impressoras.");
+                    }
                 }
             }
             catch (JsonException ex)

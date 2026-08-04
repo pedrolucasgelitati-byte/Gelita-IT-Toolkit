@@ -23,7 +23,10 @@ namespace GelitaITToolkit.Services
                     unit.PrintServer,
                     name,
                     unit.Name,
-                    unit.ScannerModels.TryGetValue(name, out var model) ? model : "Modelo não informado"))
+                    unit.PrinterModels.TryGetValue(name, out var model) ||
+                    unit.ScannerModels.TryGetValue(name, out model)
+                        ? model
+                        : "Modelo não informado"))
                 .ToList();
             return Task.FromResult(printers);
         }

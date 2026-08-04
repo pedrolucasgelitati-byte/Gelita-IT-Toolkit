@@ -106,9 +106,11 @@ namespace GelitaITToolkit.Services
                     if (template.Device != null && template.Parent != null)
                     {
                         device = template.Device.DeepClone() as JsonObject;
-                        scannerGroups.Add(new JsonArray(device));
+                        if (device != null)
+                            scannerGroups.Add(new JsonArray(device));
                     }
-                    else
+
+                    if (device == null)
                     {
                         device = CreateEpsonDeviceDefinition(scanner.Model);
                         var configuredDeviceList = (root as JsonObject)?["DeviceList"] as JsonArray;

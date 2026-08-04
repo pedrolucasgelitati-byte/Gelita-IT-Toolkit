@@ -267,6 +267,15 @@ namespace GelitaITToolkit.Services
                     }
                 }
 
+                foreach ($fileName in @('.env')) {
+                    $oldFile = Join-Path $backup $fileName
+                    $newFile = Join-Path $InstallDirectory $fileName
+                    if (Test-Path -LiteralPath $oldFile) {
+                        Copy-Item -LiteralPath $oldFile -Destination $newFile -Force
+                        Add-Content -LiteralPath $log -Value ("Configuração local preservada: " + $fileName)
+                    }
+                }
+
                 $newExecutable = Join-Path $InstallDirectory $ExecutableName
                 Start-Process -FilePath $newExecutable -WorkingDirectory $InstallDirectory
                 Add-Content -LiteralPath $log -Value "Atualização concluída. Backup: $backup"
