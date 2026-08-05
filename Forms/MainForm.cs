@@ -71,7 +71,6 @@ namespace GelitaITToolkit.Forms
         /// <summary>
         /// Lista que armazena os controles dos scanners adicionados dinamicamente.
         /// </summary>
-        private List<ScannerRow> _scannerRows;
 
         /// <summary>
         /// TabControl que organiza as abas da interface.
@@ -158,7 +157,6 @@ namespace GelitaITToolkit.Forms
 
             // Inicializar coleções
             _units = new Dictionary<string, Unit>();
-            _scannerRows = new List<ScannerRow>();
 
             // Configurar formulário
             this.Text = "Gelita IT Toolkit";

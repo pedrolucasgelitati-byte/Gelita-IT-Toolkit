@@ -95,6 +95,30 @@ jobs:
           @{ version='${{ steps.version.outputs.version }}'; tag='${{ steps.version.outputs.tag }}' } |
             ConvertTo-Json | Set-Content .\publish\version.json -Encoding utf8
 
+      - name: Validar conteúdo portátil
+        shell: pwsh
+        run: |
+          $required = @(
+            '.\publish\Gelita-IT-Toolkit.exe',
+            '.\publish\Config\printers.json',
+            '.\publish\Config\toolkit-settings.json',
+            '.\publish\Config\installer-hashes.json',
+            '.\publish\Config\security-policy.json',
+            '.\publish\Assets',
+            '.\publish\LEIA-ME.txt',
+            '.\publish\Abrir-Gelita-IT-Toolkit.cmd',
+            '.\publish\version.json'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Conteúdo obrigatório ausente: $path" }
+          }
+          Get-ChildItem .\publish\Config\*.json | ForEach-Object {
+            Get-Content -LiteralPath $_.FullName -Raw -Encoding utf8 | ConvertFrom-Json | Out-Null
+          }
+          if (Test-Path -LiteralPath .\publish\.env) {
+            throw 'Configuração local foi incluída antes da etapa de assinatura.'
+          }
+
       - name: Assinar executável
         shell: pwsh
         env:

@@ -1,5 +1,5 @@
-GELITA IT TOOLKIT 1.0.4
-========================
+GELITA IT TOOLKIT
+=================
 
 COMO EXECUTAR NA MAQUINA DO USUARIO
 

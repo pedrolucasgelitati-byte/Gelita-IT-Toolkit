@@ -112,16 +112,19 @@ namespace GelitaITToolkit.Services
 
         public async Task<bool> TestRawPrintPortAsync(
             string host,
+            int port = 9100,
             int timeoutMilliseconds = 3000,
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(host);
+            ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
             using var client = new TcpClient();
             using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMilliseconds));
             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, cancellationToken);
             try
             {
-                await client.ConnectAsync(host, 9100, linkedCancellation.Token);
+                await client.ConnectAsync(host, port, linkedCancellation.Token);
                 return client.Connected;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

@@ -74,6 +74,7 @@ namespace GelitaITToolkit.Services
                 => (_owner, _key, _source) = (owner, key, source);
             public CancellationToken Token => _source.Token;
             public void MarkFailed() => _outcome = TelemetryOutcome.TechnicalFailure;
+            public void MarkCancelled() => _outcome = TelemetryOutcome.UserCancelled;
             public void MarkValidationBlocked() => _outcome = TelemetryOutcome.ValidationBlocked;
             public void MarkTimedOut() => _outcome = TelemetryOutcome.Timeout;
             public void Dispose()

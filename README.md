@@ -2,7 +2,9 @@
 
 Ferramenta interna e portátil do Service Desk da Gelita para preparar, configurar, diagnosticar e reparar computadores Windows.
 
-**Versão atual:** 1.0.4
+**Versão publicada:** consulte a seção
+[Releases](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest);
+o número é mantido automaticamente no projeto e na tag Git.
 **Plataforma:** Windows x64
 **Tecnologia:** .NET 8 e Windows Forms
 
@@ -110,8 +112,8 @@ O erro **“dotnet não é reconhecido”** significa que o SDK não está insta
 installerprinters/
 ├── Assets/                         Instaladores, ícone e pacotes auxiliares
 ├── Config/                         Configurações JSON
-├── Core/                           Modelos e serviços centrais
 ├── Forms/                          Interface Windows Forms
+├── Models/                         Contratos de dados
 ├── Services/                       Instalação, diagnóstico e integrações
 ├── Program.cs                      Ponto de entrada
 ├── Gelita-IT-Toolkit.csproj        Configuração do projeto
@@ -126,8 +128,6 @@ Os instaladores grandes ou confidenciais podem estar ignorados pelo Git. Eles pr
 
 | Arquivo | Finalidade |
 | --- | --- |
-| `Config/appsettings.json` | Configuração geral da aplicação e logs |
-| `Config/units.json` | Unidades disponíveis |
 | `Config/printers.json` | Impressoras e scanners de cada unidade |
 | `Config/toolkit-settings.json` | Caminhos dos programas, pacotes e recursos |
 | `Config/installer-hashes.json` | Hashes SHA-256 permitidos para instaladores |
@@ -325,7 +325,7 @@ dotnet publish .\Gelita-IT-Toolkit.csproj `
   -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:DebugType=None `
   -p:DebugSymbols=false `
-  -o .\dist\Gelita-IT-Toolkit-v1.0.4-win-x64
+  -o .\dist\Gelita-IT-Toolkit-win-x64
 ```
 
 Antes de distribuir:

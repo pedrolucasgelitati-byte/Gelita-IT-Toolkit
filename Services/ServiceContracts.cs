@@ -20,7 +20,11 @@ namespace GelitaITToolkit.Services
         bool IsPrinterInstalled(string printerName, IReadOnlyCollection<string> installedPrinterNames);
         Task<bool> SetDefaultPrinter(Printer printer, CancellationToken cancellationToken = default);
         Task<bool> PrintTestPage(Printer printer, CancellationToken cancellationToken = default);
-        Task<bool> TestRawPrintPortAsync(string host, int timeoutMilliseconds = 3000, CancellationToken cancellationToken = default);
+        Task<bool> TestRawPrintPortAsync(
+            string host,
+            int port = 9100,
+            int timeoutMilliseconds = 3000,
+            CancellationToken cancellationToken = default);
         Task<(bool Http, bool Https, string? Url)> TestDeviceWebPageAsync(string host, int timeoutMilliseconds = 4000, CancellationToken cancellationToken = default);
         Task<bool> RepairOfflineQueuesAsync(CancellationToken cancellationToken = default);
         IReadOnlyList<IReadOnlyList<string>> FindDuplicateInstalledPrinters();

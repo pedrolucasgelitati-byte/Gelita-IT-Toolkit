@@ -8,25 +8,32 @@ namespace GelitaITToolkit.Forms
     public partial class MainForm
     {
         private static readonly System.Threading.AsyncLocal<System.Threading.CancellationToken> CurrentOperationToken = new();
+        private static readonly System.Threading.AsyncLocal<EventExecutionContext?> CurrentEventExecution = new();
 
         private async Task ExecuteEventHandlerAsync(Func<Task> handler)
         {
+            var previousContext = CurrentEventExecution.Value;
+            var context = new EventExecutionContext();
+            CurrentEventExecution.Value = context;
             try
             {
                 await handler();
             }
             catch (OperationCanceledException)
             {
+                context.Outcome = TelemetryOutcome.UserCancelled;
                 AddLog("Operação cancelada pelo usuário.", LogLevel.Warning);
                 UpdateStatusLabel("Operação cancelada.");
             }
             catch (TimeoutException ex)
             {
+                context.Outcome = TelemetryOutcome.Timeout;
                 AddLog($"Tempo limite excedido: {ex.Message}", LogLevel.Error);
                 UpdateStatusLabel("Tempo limite excedido.");
             }
             catch (Exception ex)
             {
+                context.Outcome = TelemetryOutcome.TechnicalFailure;
                 AddLog($"Falha técnica não tratada: {ex.Message}", LogLevel.Error);
                 UpdateStatusLabel("A operação falhou.");
                 MessageBox.Show(
@@ -34,6 +41,11 @@ namespace GelitaITToolkit.Forms
                     "Gelita IT Toolkit",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+            }
+            finally
+            {
+                context.Complete();
+                CurrentEventExecution.Value = previousContext;
             }
         }
 
@@ -83,10 +95,35 @@ namespace GelitaITToolkit.Forms
             public void MarkTimedOut() => _lease?.MarkTimedOut();
             public void Dispose()
             {
-                _lease?.Dispose();
+                if (_lease != null && CurrentEventExecution.Value != null)
+                    CurrentEventExecution.Value.Register(_lease);
+                else
+                    _lease?.Dispose();
                 _lease = null;
                 CurrentOperationToken.Value = _previousToken;
                 if (_button is { IsDisposed: false }) _button.Enabled = true;
+            }
+        }
+
+        private sealed class EventExecutionContext
+        {
+            private readonly System.Collections.Generic.List<OperationCoordinator.OperationLease> _leases = new();
+            public TelemetryOutcome Outcome { get; set; } = TelemetryOutcome.Completed;
+            public void Register(OperationCoordinator.OperationLease lease) => _leases.Add(lease);
+            public void Complete()
+            {
+                foreach (var lease in _leases)
+                {
+                    switch (Outcome)
+                    {
+                        case TelemetryOutcome.TechnicalFailure: lease.MarkFailed(); break;
+                        case TelemetryOutcome.UserCancelled: lease.MarkCancelled(); break;
+                        case TelemetryOutcome.ValidationBlocked: lease.MarkValidationBlocked(); break;
+                        case TelemetryOutcome.Timeout: lease.MarkTimedOut(); break;
+                    }
+                    lease.Dispose();
+                }
+                _leases.Clear();
             }
         }
 

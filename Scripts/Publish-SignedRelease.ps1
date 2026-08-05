@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $projectRoot 'Gelita-IT-Toolkit.csproj'
-[xml]$project = Get-Content -LiteralPath $projectPath
+[xml]$project = Get-Content -LiteralPath $projectPath -Raw -Encoding utf8
 $version = $project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
 if ([string]::IsNullOrWhiteSpace($version)) { throw 'Versão não encontrada no projeto.' }
 $publishPath = Join-Path $projectRoot 'publish-signed'
@@ -44,10 +44,18 @@ try {
     if ($signature.SignerCertificate.Thumbprint -ne $CertificateThumbprint) { throw 'O assinante não corresponde ao thumbprint autorizado.' }
 
     "GELITA_TOOLKIT_SIGNER_THUMBPRINT=$CertificateThumbprint" | Set-Content -LiteralPath (Join-Path $publishPath '.env') -Encoding ascii
+    @{ version = $version; tag = "v$version" } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $publishPath 'version.json') -Encoding utf8
     $baseName = "Gelita-IT-Toolkit-v$version-win-x64"
     $zipPath = Join-Path $destination "$baseName.zip"
     $hashPath = "$zipPath.sha256"
     Compress-Archive -Path (Join-Path $publishPath '*'),(Join-Path $publishPath '.env') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+    & (Join-Path $PSScriptRoot 'Test-ReleaseVersion.ps1') `
+        -ExpectedVersion $version `
+        -ExpectedTag "v$version" `
+        -ExecutablePath $executable `
+        -ZipPath $zipPath `
+        -ProjectPath $projectPath
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash
     "$hash  $baseName.zip" | Set-Content -LiteralPath $hashPath -Encoding ascii
     Write-Host "Release assinada: $zipPath"
