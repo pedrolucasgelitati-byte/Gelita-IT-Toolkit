@@ -354,9 +354,10 @@ O arquivo `.env` local é copiado da instalação anterior para a nova. Ele não
 incluído no pacote publicado e não é enviado ao GitHub.
 
 Além do número da versão, o Toolkit compara o SHA-256 do pacote publicado com o
-pacote instalado. Assim, uma correção publicada na mesma versão também é
-oferecida como atualização. O workflow `publish-current-version.yml` recompila e
-substitui os arquivos da release atual a cada push na branch `main`.
+pacote instalado. O workflow `publish-current-version.yml` é iniciado manualmente
+na aba Actions, permite escolher incremento `patch`, `minor` ou `major` e cria uma
+release imutável para a nova versão. Antes da publicação ele confirma que projeto,
+metadados do executável, manifesto do ZIP e tag possuem exatamente a mesma versão.
 
 A consulta por atualizações também ocorre silenciosamente ao iniciar, sem impedir
 o uso do programa quando a rede ou o GitHub estiverem indisponíveis. A assinatura
@@ -407,11 +408,19 @@ Além da compilação, faça testes em uma máquina sem configurações anterior
 
 ## Controle de versão
 
-- Atualize `Version`, `AssemblyVersion` e `FileVersion` no projeto.
-- Registre alterações relevantes no changelog da versão.
-- Faça o commit somente dos arquivos revisados.
-- Publique uma tag no formato `vX.Y.Z`.
-- Anexe o ZIP e seu checksum ao Release.
+- Abra **Actions → Criar release versionada → Run workflow**.
+- Escolha o incremento SemVer: `patch`, `minor` ou `major`.
+- Informe quantas releases estáveis devem ser mantidas, entre 1 e 50.
+- O workflow calcula a versão, atualiza `Version`, `AssemblyVersion` e
+  `FileVersion`, gera a entrada do `CHANGELOG.md` e as release notes.
+- Somente depois de build, testes, assinatura e validação, ele envia o commit,
+  cria a tag anotada `vX.Y.Z` e publica ZIP e SHA-256.
+- Releases estáveis além da retenção são removidas junto com suas tags. Drafts e
+  pré-releases não entram nessa limpeza.
+
+Os scripts `Scripts/Set-ReleaseVersion.ps1` e
+`Scripts/Test-ReleaseVersion.ps1` também podem ser usados para validar o fluxo
+localmente. Nunca crie manualmente uma tag de release antes da assinatura passar.
 
 ## Documentos antigos
 
