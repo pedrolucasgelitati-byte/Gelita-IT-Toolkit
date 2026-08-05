@@ -34,4 +34,28 @@ public sealed class UpdateServiceTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [TestMethod]
+    public void AtualizadorDevePreservarPermissoesDaInstalacao()
+    {
+        var script = UpdateService.BuildUpdaterScript();
+        var captureIndex = script.IndexOf(
+            "$originalInstallAcl = Get-Acl -LiteralPath $InstallDirectory",
+            StringComparison.Ordinal);
+        var replaceIndex = script.IndexOf(
+            "Move-Item -LiteralPath $PayloadDirectory -Destination $InstallDirectory",
+            StringComparison.Ordinal);
+        var restoreIndex = script.IndexOf(
+            "Restore-InstallPermissions -Root $InstallDirectory -OriginalAcl $originalInstallAcl",
+            StringComparison.Ordinal);
+        var startIndex = script.IndexOf(
+            "Start-Process -FilePath $newExecutable",
+            StringComparison.Ordinal);
+
+        Assert.IsGreaterThanOrEqualTo(0, captureIndex);
+        Assert.IsGreaterThan(captureIndex, replaceIndex);
+        Assert.IsGreaterThan(replaceIndex, restoreIndex);
+        Assert.IsGreaterThan(restoreIndex, startIndex);
+        StringAssert.Contains(script, "$itemAcl.SetAccessRuleProtection($false, $true)");
+    }
 }

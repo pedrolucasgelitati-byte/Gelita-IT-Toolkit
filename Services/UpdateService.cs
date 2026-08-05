@@ -259,7 +259,7 @@ namespace GelitaITToolkit.Services
             }
         }
 
-        private static string BuildUpdaterScript() =>
+        internal static string BuildUpdaterScript() =>
             """
             param(
                 [Parameter(Mandatory=$true)][int]$ProcessId,
@@ -275,6 +275,20 @@ namespace GelitaITToolkit.Services
             $failed = Join-Path $parent ($leaf + '-failed-' + $timestamp)
             $log = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'updater.log'
 
+            function Restore-InstallPermissions {
+                param(
+                    [Parameter(Mandatory=$true)][string]$Root,
+                    [Parameter(Mandatory=$true)]$OriginalAcl
+                )
+
+                Set-Acl -LiteralPath $Root -AclObject $OriginalAcl
+                Get-ChildItem -LiteralPath $Root -Force -Recurse | ForEach-Object {
+                    $itemAcl = Get-Acl -LiteralPath $_.FullName
+                    $itemAcl.SetAccessRuleProtection($false, $true)
+                    Set-Acl -LiteralPath $_.FullName -AclObject $itemAcl
+                }
+            }
+
             try {
                 Add-Content -LiteralPath $log -Value "Aguardando o Toolkit encerrar..."
                 Wait-Process -Id $ProcessId -ErrorAction SilentlyContinue
@@ -284,6 +298,7 @@ namespace GelitaITToolkit.Services
                     throw 'Executável ausente no pacote preparado.'
                 }
 
+                $originalInstallAcl = Get-Acl -LiteralPath $InstallDirectory
                 Move-Item -LiteralPath $InstallDirectory -Destination $backup
                 Move-Item -LiteralPath $PayloadDirectory -Destination $InstallDirectory
 
@@ -306,6 +321,9 @@ namespace GelitaITToolkit.Services
                         Add-Content -LiteralPath $log -Value ("Configuração local preservada: " + $fileName)
                     }
                 }
+
+                Restore-InstallPermissions -Root $InstallDirectory -OriginalAcl $originalInstallAcl
+                Add-Content -LiteralPath $log -Value 'Permissões originais da instalação restauradas.'
 
                 $newExecutable = Join-Path $InstallDirectory $ExecutableName
                 Start-Process -FilePath $newExecutable -WorkingDirectory $InstallDirectory
