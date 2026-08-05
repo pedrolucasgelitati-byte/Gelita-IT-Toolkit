@@ -5,6 +5,8 @@ namespace GelitaITToolkit
     using System.Windows.Forms;
     using GelitaITToolkit.Forms;
     using GelitaITToolkit.Helpers;
+    using GelitaITToolkit.Services;
+    using Microsoft.Extensions.DependencyInjection;
 
     /// <summary>
     /// Classe de entrada da aplicação Gelita IT Toolkit.
@@ -37,8 +39,8 @@ namespace GelitaITToolkit
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 
-                // Executar a aplicação com o formulário principal
-                Application.Run(new MainForm());
+                using var services = ConfigureServices();
+                Application.Run(services.GetRequiredService<MainForm>());
             }
             catch (Exception ex)
             {
@@ -48,6 +50,33 @@ namespace GelitaITToolkit
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
+        }
+
+        internal static ServiceProvider ConfigureServices(Action<IServiceCollection>? configureOverrides = null)
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<ProcessService>();
+            services.AddSingleton<OperationCoordinator>();
+            services.AddSingleton<LocalTelemetryService>();
+            services.AddSingleton<ConfigService>();
+            services.AddSingleton<IPrinterService, PrinterService>();
+            services.AddSingleton<IScannerService, ScannerService>();
+            services.AddSingleton<Naps2ProfileService>();
+            services.AddSingleton<ScannerValidationService>();
+            services.AddSingleton<IHardwareInventoryService, HardwareInventoryService>();
+            services.AddSingleton<ICitrixService, CitrixService>();
+            services.AddSingleton<IRepairService, RepairService>();
+            services.AddSingleton<BackupService>();
+            services.AddSingleton<SystemSecurityService>();
+            services.AddSingleton<WindowsFeatureUpdateService>();
+            services.AddSingleton<IUpdateService, UpdateService>();
+            services.AddTransient<MainForm>();
+            configureOverrides?.Invoke(services);
+            return services.BuildServiceProvider(new ServiceProviderOptions
+            {
+                ValidateOnBuild = true,
+                ValidateScopes = true
+            });
         }
     }
 }

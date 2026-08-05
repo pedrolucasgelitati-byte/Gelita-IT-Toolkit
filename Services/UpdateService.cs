@@ -15,14 +15,21 @@ namespace GelitaITToolkit.Services
     using System.Threading;
     using System.Threading.Tasks;
 
-    public sealed class UpdateService
+    public sealed class UpdateService : IUpdateService
     {
         private const string PackageHashFileName = ".toolkit-package.sha256";
+        private const int MaximumArchiveEntries = 10_000;
+        private const long MaximumExtractedBytes = 2L * 1024 * 1024 * 1024;
+        private const long MaximumSingleFileBytes = 1024L * 1024 * 1024;
         private readonly HttpClient _httpClient;
+        private readonly bool _ownsHttpClient;
 
         public UpdateService(HttpClient? httpClient = null)
         {
+            _ownsHttpClient = httpClient == null;
             _httpClient = httpClient ?? new HttpClient();
+            if (httpClient == null)
+                _httpClient.Timeout = TimeSpan.FromMinutes(2);
             if (!_httpClient.DefaultRequestHeaders.UserAgent.Any())
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Gelita-IT-Toolkit");
             var privateRepositoryToken = Environment.GetEnvironmentVariable("GELITA_TOOLKIT_GITHUB_TOKEN");
@@ -32,6 +39,12 @@ namespace GelitaITToolkit.Services
                 _httpClient.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", privateRepositoryToken);
             }
+        }
+
+        public void Dispose()
+        {
+            if (_ownsHttpClient)
+                _httpClient.Dispose();
         }
 
         public async Task<UpdateInfo> CheckAsync(CancellationToken cancellationToken = default)
@@ -144,6 +157,14 @@ namespace GelitaITToolkit.Services
                 throw new InvalidDataException(
                     $"A versão do executável no pacote ({fileVersion ?? "não identificada"}) é inferior à versão anunciada ({targetVersion}).");
 
+            var trustedSigner = EnvironmentConfig.Get("GELITA_TOOLKIT_SIGNER_THUMBPRINT");
+            if (!string.IsNullOrWhiteSpace(trustedSigner) &&
+                !await SecurityHelper.HasValidSignatureAsync(executable, trustedSigner))
+            {
+                throw new InvalidDataException(
+                    "A assinatura digital do executável não corresponde ao certificado autorizado.");
+            }
+
             var packageHash = SecurityHelper.CalculateSha256(validatedZipPath);
             await File.WriteAllTextAsync(
                 Path.Combine(payloadDirectory, PackageHashFileName),
@@ -195,16 +216,26 @@ namespace GelitaITToolkit.Services
                 throw new InvalidOperationException("Não foi possível iniciar o instalador da atualização.");
         }
 
-        private static async Task ExtractZipSafelyAsync(
+        internal static async Task ExtractZipSafelyAsync(
             string zipPath,
             string destinationDirectory,
             CancellationToken cancellationToken)
         {
             var destinationRoot = Path.GetFullPath(destinationDirectory) + Path.DirectorySeparatorChar;
             using var archive = ZipFile.OpenRead(zipPath);
+            if (archive.Entries.Count > MaximumArchiveEntries)
+                throw new InvalidDataException($"O pacote excede o limite de {MaximumArchiveEntries:N0} entradas.");
+
+            long totalLength = 0;
             foreach (var entry in archive.Entries)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (entry.Length > MaximumSingleFileBytes)
+                    throw new InvalidDataException($"O arquivo '{entry.FullName}' excede o tamanho permitido.");
+                totalLength = checked(totalLength + entry.Length);
+                if (totalLength > MaximumExtractedBytes)
+                    throw new InvalidDataException("O conteúdo descompactado excede 2 GB.");
+
                 var destinationPath = Path.GetFullPath(Path.Combine(destinationDirectory, entry.FullName));
                 if (!destinationPath.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"O pacote contém um caminho inseguro: {entry.FullName}");
@@ -308,7 +339,7 @@ namespace GelitaITToolkit.Services
                 ? name.GetString() ?? string.Empty
                 : string.Empty;
 
-        private static string ExtractSha256(string text) =>
+        internal static string ExtractSha256(string text) =>
             text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
                 .FirstOrDefault(value => value.Length == 64 && value.All(Uri.IsHexDigit))
             ?? string.Empty;

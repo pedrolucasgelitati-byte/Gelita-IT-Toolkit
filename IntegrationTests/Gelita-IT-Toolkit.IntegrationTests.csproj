@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
-    <AssemblyName>Gelita-IT-Toolkit.SmokeTests</AssemblyName>
+    <AssemblyName>Gelita-IT-Toolkit.IntegrationTests</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gelita-IT-Toolkit.csproj" />

@@ -45,6 +45,8 @@ TestResults/
 *.snupkg
 packages/
 .nuget/
+*.pfx
+*.p12
 
 # Application Logs (exclude generated logs)
 Logs/*.log
@@ -77,6 +79,8 @@ Thumbs.db
 out/
 dist/
 publish/
+publish-signed/
+artifacts/
 
 # Local environment variables
 .env

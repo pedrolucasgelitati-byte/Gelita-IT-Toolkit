@@ -15,6 +15,7 @@ namespace GelitaITToolkit.Forms
     using System.Threading.Tasks;
     using System.Windows.Forms;
     using GelitaITToolkit.Helpers;
+    using GelitaITToolkit.Forms.Modules;
     using GelitaITToolkit.Models;
     using GelitaITToolkit.Services;
     using Microsoft.Win32;
@@ -26,15 +27,6 @@ namespace GelitaITToolkit.Forms
     /// </summary>
     public partial class MainForm : Form
     {
-        private sealed class HardwareInfo
-        {
-            public string Processor { get; init; } = "Não identificado";
-            public string TotalMemory { get; init; } = "Não identificado";
-            public string MemoryType { get; init; } = "Não identificado";
-            public string MemorySpeed { get; init; } = "Não identificado";
-            public string ServiceTag { get; init; } = "Não identificado";
-        }
-
         private sealed class ScannerPrinterOption
         {
             public string PrinterName { get; init; } = string.Empty;
@@ -45,42 +37,6 @@ namespace GelitaITToolkit.Forms
                 : $"{PrinterName} — {ScannerModel}";
         }
 
-        private sealed class CitrixStoreOption
-        {
-            public string Name { get; init; } = string.Empty;
-            public string DiscoveryUrl { get; init; } = string.Empty;
-            public bool IsPrimary { get; init; }
-
-            public override string ToString() => Name;
-        }
-
-        private sealed class MemoryModuleInfo
-        {
-            public ushort Type { get; init; }
-            public ushort SpeedMHz { get; init; }
-            public ulong CapacityBytes { get; init; }
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private struct MemoryStatusEx
-        {
-            public uint Length;
-            public uint MemoryLoad;
-            public ulong TotalPhys;
-            public ulong AvailPhys;
-            public ulong TotalPageFile;
-            public ulong AvailPageFile;
-            public ulong TotalVirtual;
-            public ulong AvailVirtual;
-            public ulong AvailExtendedVirtual;
-        }
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern uint GetSystemFirmwareTable(uint firmwareTableProviderSignature, uint firmwareTableId, IntPtr firmwareTableBuffer, uint bufferSize);
-
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);
 
@@ -89,8 +45,23 @@ namespace GelitaITToolkit.Forms
         /// <summary>
         /// Serviço responsável por carregar configurações de JSON.
         /// </summary>
-        private ConfigService _configService;
-        private PrinterService _printerService;
+        private readonly ConfigService _configService;
+        private readonly IPrinterService _printerService;
+        private readonly IScannerService _scannerService;
+        private readonly Naps2ProfileService _naps2ProfileService;
+        private readonly ScannerValidationService _scannerValidationService;
+        private readonly IHardwareInventoryService _hardwareInventoryService;
+        private readonly IRepairService _repairService;
+        private readonly ICitrixService _citrixService;
+        private readonly BackupService _backupService;
+        private readonly SystemSecurityService _systemSecurityService;
+        private readonly WindowsFeatureUpdateService _windowsFeatureUpdateService;
+        private readonly IUpdateService _updateService;
+        private readonly ProcessService _processService;
+        private readonly OperationCoordinator _operationCoordinator;
+        private readonly LocalTelemetryService _localTelemetryService;
+        private ToolStripButton _cancelOperationButton = null!;
+        private RichTextBox _telemetrySummaryRichTextBox = null!;
 
         /// <summary>
         /// Dicionário que armazena as unidades carregadas do JSON.
@@ -151,11 +122,39 @@ namespace GelitaITToolkit.Forms
         /// Inicializa uma nova instância da classe <see cref="MainForm"/>.
         /// Configura tamanho, posição e estilo da janela.
         /// </summary>
-        public MainForm()
+        public MainForm(
+            ConfigService configService,
+            IPrinterService printerService,
+            IScannerService scannerService,
+            Naps2ProfileService naps2ProfileService,
+            ScannerValidationService scannerValidationService,
+            IHardwareInventoryService hardwareInventoryService,
+            IRepairService repairService,
+            ICitrixService citrixService,
+            BackupService backupService,
+            SystemSecurityService systemSecurityService,
+            WindowsFeatureUpdateService windowsFeatureUpdateService,
+            IUpdateService updateService,
+            ProcessService processService,
+            OperationCoordinator operationCoordinator,
+            LocalTelemetryService localTelemetryService)
         {
-            // Inicializar serviço de configuração
-            _configService = new ConfigService();
-            _printerService = new PrinterService();
+            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+            _printerService = printerService ?? throw new ArgumentNullException(nameof(printerService));
+            _scannerService = scannerService ?? throw new ArgumentNullException(nameof(scannerService));
+            _naps2ProfileService = naps2ProfileService ?? throw new ArgumentNullException(nameof(naps2ProfileService));
+            _scannerValidationService = scannerValidationService ?? throw new ArgumentNullException(nameof(scannerValidationService));
+            _hardwareInventoryService = hardwareInventoryService ?? throw new ArgumentNullException(nameof(hardwareInventoryService));
+            _repairService = repairService ?? throw new ArgumentNullException(nameof(repairService));
+            _citrixService = citrixService ?? throw new ArgumentNullException(nameof(citrixService));
+            _backupService = backupService ?? throw new ArgumentNullException(nameof(backupService));
+            _systemSecurityService = systemSecurityService ?? throw new ArgumentNullException(nameof(systemSecurityService));
+            _windowsFeatureUpdateService = windowsFeatureUpdateService ?? throw new ArgumentNullException(nameof(windowsFeatureUpdateService));
+            _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+            _processService = processService ?? throw new ArgumentNullException(nameof(processService));
+            _localTelemetryService = localTelemetryService ?? throw new ArgumentNullException(nameof(localTelemetryService));
+            _operationCoordinator = operationCoordinator ?? throw new ArgumentNullException(nameof(operationCoordinator));
+            _operationCoordinator.StateChanged += OperationCoordinator_StateChanged;
 
             // Inicializar coleções
             _units = new Dictionary<string, Unit>();
@@ -402,22 +401,22 @@ namespace GelitaITToolkit.Forms
             };
 
             // Aba 1: Dashboard
-            _tabControl.TabPages.Add(CreateDashboardTab());
+            _tabControl.TabPages.Add(new DashboardControl(BuildDashboardView()).CreateHostTab());
 
             // Aba 2: Impressoras
-            _tabControl.TabPages.Add(CreatePrintersTab());
+            _tabControl.TabPages.Add(new PrintersControl(BuildPrintersView()).CreateHostTab());
 
             // Aba 3: Scanners
-            _tabControl.TabPages.Add(CreateScannersTab());
+            _tabControl.TabPages.Add(new ScannersControl(BuildScannersView()).CreateHostTab());
 
             // Aba 4: Instalações
-            _tabControl.TabPages.Add(CreateInstallationsTab());
+            _tabControl.TabPages.Add(new InstallationsControl(BuildInstallationsView()).CreateHostTab());
 
             // Aba 5: Citrix
             _tabControl.TabPages.Add(CreateCitrixTab());
 
             // Aba 6: Ferramentas
-            _tabControl.TabPages.Add(CreateToolsTab());
+            _tabControl.TabPages.Add(new RepairsControl(BuildRepairsView()).CreateHostTab());
 
             // Aba 6: Configurações
             _tabControl.TabPages.Add(CreateSettingsTab());
@@ -429,16 +428,7 @@ namespace GelitaITToolkit.Forms
             _tabControl.TabPages.Add(CreateAboutTab());
 
             ConfigureResponsiveLayout();
-            this.Shown += async (_, _) =>
-            {
-                // O SplitContainer ainda tem o tamanho padrão durante a construção;
-                // reaplica a largura quando a janela já possui suas dimensões reais.
-                _navigationContainer.SplitterDistance = 220;
-                UseAvailableTabSpace();
-                await Task.WhenAll(
-                    LoadDashboardHardwareAsync(),
-                    RefreshInstallationStatusesAsync());
-            };
+            this.Shown += MainForm_Shown;
             ApplyVisualStyle(_tabControl);
 
             _navigationContainer = new SplitContainer
@@ -456,13 +446,25 @@ namespace GelitaITToolkit.Forms
             AddLog("Aplicação iniciada", LogLevel.Info);
         }
 
+        private async void MainForm_Shown(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(MainForm_ShownAsync);
+
+        private async Task MainForm_ShownAsync()
+        {
+            _navigationContainer.SplitterDistance = 220;
+            UseAvailableTabSpace();
+            await Task.WhenAll(
+                LoadDashboardHardwareAsync(),
+                RefreshInstallationStatusesAsync());
+        }
+
         #region Criação das Abas
 
         /// <summary>
         /// Cria a aba Dashboard com informações do computador.
         /// Mostra: Nome, Usuário, Domínio, IP, SO, Status.
         /// </summary>
-        private TabPage CreateDashboardTab()
+        private TabPage BuildDashboardView()
         {
             var tabPage = new TabPage
             {
@@ -480,7 +482,7 @@ namespace GelitaITToolkit.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
-            var hardware = new HardwareInfo
+            var hardware = new HardwareInventory
             {
                 Processor = "Carregando...",
                 TotalMemory = "Carregando...",
@@ -488,7 +490,7 @@ namespace GelitaITToolkit.Forms
                 MemorySpeed = "Carregando...",
                 ServiceTag = "Carregando..."
             };
-            var operatingSystem = GetOperatingSystemInfo();
+            var operatingSystem = _hardwareInventoryService.GetOperatingSystem();
 
             // Nome do Computador
             var computerLabel = new Label
@@ -570,7 +572,7 @@ namespace GelitaITToolkit.Forms
                 Size = new Size(300, 25),
                 Font = new Font("Segoe UI", 9),
                 ReadOnly = true,
-                Text = GetPrimaryIpAddress()
+                Text = _hardwareInventoryService.GetPrimaryIpAddress()
             };
             infoPanel.Controls.Add(ipValue);
 
@@ -590,7 +592,7 @@ namespace GelitaITToolkit.Forms
                 Size = new Size(300, 25),
                 Font = new Font("Segoe UI", 9),
                 ReadOnly = true,
-                Text = GetPrimaryMacAddress()
+                Text = _hardwareInventoryService.GetPrimaryMacAddress()
             };
             infoPanel.Controls.Add(macValue);
 
@@ -671,7 +673,7 @@ namespace GelitaITToolkit.Forms
         /// Cria a aba Impressoras com seleção de unidade, pesquisa, lista e botões.
         /// Botões: Instalar, Instalar Todas, Remover, Atualizar.
         /// </summary>
-        private TabPage CreatePrintersTab()
+        private TabPage BuildPrintersView()
         {
             var tabPage = new TabPage
             {
@@ -975,7 +977,7 @@ namespace GelitaITToolkit.Forms
         /// Cria a aba Scanners com lista dinâmica, IP, modelo e botões.
         /// Botões: Adicionar, Remover, Testar Ping.
         /// </summary>
-        private TabPage CreateScannersTab()
+        private TabPage BuildScannersView()
         {
             var tabPage = new TabPage
             {
@@ -1250,7 +1252,7 @@ namespace GelitaITToolkit.Forms
         /// Checkboxes: Epson Scan 2, NAPS, Drivers.
         /// Botão: Instalar.
         /// </summary>
-        private TabPage CreateInstallationsTab()
+        private TabPage BuildInstallationsView()
         {
             var tabPage = new TabPage
             {
@@ -1570,7 +1572,7 @@ namespace GelitaITToolkit.Forms
             return tabPage;
         }
 
-        private TabPage CreateToolsTab()
+        private TabPage BuildRepairsView()
         {
             var tabPage = new TabPage
             {
@@ -1819,7 +1821,8 @@ namespace GelitaITToolkit.Forms
             {
                 Text = "Configurações",
                 Name = "SettingsTab",
-                Padding = new Padding(10)
+                Padding = new Padding(10),
+                AutoScroll = true
             };
 
             // Painel de Configurações
@@ -1827,7 +1830,7 @@ namespace GelitaITToolkit.Forms
             {
                 Text = "Gerenciamento de Configurações",
                 Location = new Point(10, 10),
-                Size = new Size(950, 500),
+                Size = new Size(950, 690),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
@@ -1915,8 +1918,49 @@ namespace GelitaITToolkit.Forms
             statusTextBox.Text = "Clique em 'Recarregar Configurações' para atualizar";
             settingsPanel.Controls.Add(statusTextBox);
 
+            settingsPanel.Controls.Add(new Label
+            {
+                Text = "Resumo da Telemetria Local:",
+                Location = new Point(20, 495),
+                Size = new Size(300, 25),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            });
+
+            _telemetrySummaryRichTextBox = new RichTextBox
+            {
+                Name = "SettingsTelemetryRichTextBox",
+                Location = new Point(20, 525),
+                Size = new Size(910, 140),
+                Font = new Font("Consolas", 8),
+                ReadOnly = true,
+                BackColor = Color.WhiteSmoke
+            };
+            settingsPanel.Controls.Add(_telemetrySummaryRichTextBox);
+            RefreshTelemetrySummary();
+
             tabPage.Controls.Add(settingsPanel);
             return tabPage;
+        }
+
+        private void RefreshTelemetrySummary()
+        {
+            if (_telemetrySummaryRichTextBox == null)
+                return;
+
+            var snapshot = _localTelemetryService.ReadSnapshot();
+            if (snapshot.Operations.Count == 0)
+            {
+                _telemetrySummaryRichTextBox.Text = "Nenhuma operação registrada localmente.";
+                return;
+            }
+
+            _telemetrySummaryRichTextBox.Text = string.Join(
+                Environment.NewLine,
+                snapshot.Operations.OrderBy(item => item.Key).Select(item =>
+                    $"{item.Key}: total {item.Value.Attempts} | concluídas {item.Value.Completed} | " +
+                    $"falhas {item.Value.TechnicalFailures} | canceladas {item.Value.UserCancellations} | " +
+                    $"validação {item.Value.ValidationBlocks} | timeout {item.Value.Timeouts} | " +
+                    $"média {item.Value.AverageDurationMilliseconds} ms"));
         }
 
         /// <summary>
@@ -2149,6 +2193,21 @@ namespace GelitaITToolkit.Forms
             };
             statusStrip.Items.Add(statusLabel);
 
+            _cancelOperationButton = new ToolStripButton
+            {
+                Name = "CancelOperationButton",
+                Text = "Cancelar operação",
+                Enabled = false,
+                ToolTipText = "Solicita o cancelamento das operações em andamento"
+            };
+            _cancelOperationButton.Click += (_, _) =>
+            {
+                _operationCoordinator.CancelAll();
+                UpdateStatusLabel("Cancelamento solicitado...");
+                AddLog("Cancelamento solicitado pelo usuário.", LogLevel.Warning);
+            };
+            statusStrip.Items.Add(_cancelOperationButton);
+
             this.Controls.Add(statusStrip);
         }
 
@@ -2160,7 +2219,10 @@ namespace GelitaITToolkit.Forms
         /// Evento acionado quando o formulário é carregado.
         /// Carrega as unidades e scanners do arquivo de configuração.
         /// </summary>
-        private async void MainForm_Load(object? sender, EventArgs e)
+        private async void MainForm_Load(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => MainForm_LoadAsync(sender, e));
+
+        private async Task MainForm_LoadAsync(object? sender, EventArgs e)
         {
             try
             {
@@ -2186,6 +2248,8 @@ namespace GelitaITToolkit.Forms
         /// </summary>
         private void MainForm_FormClosed(object? sender, FormClosedEventArgs e)
         {
+            _operationCoordinator.CancelAll();
+            _operationCoordinator.StateChanged -= OperationCoordinator_StateChanged;
             AddLog("Aplicação encerrada", LogLevel.Info);
         }
 
@@ -2233,7 +2297,7 @@ namespace GelitaITToolkit.Forms
 
                 // A lista é específica da máquina atual e vem do Epson Scan 2.
                 var scanners = await Task.Run(
-                    () => new ScannerService().GetConfiguredEpsonScanners());
+                    () => _scannerService.GetConfiguredEpsonScanners());
                 PopulateScannersList(scanners);
                 if (scanners.Count > 0)
                 {
@@ -2400,12 +2464,14 @@ namespace GelitaITToolkit.Forms
             SetAnchor("SettingsStatusRichTextBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
             SetAnchor("LogsRichTextBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
 
-            var toolsPanel = _tabControl.TabPages["ToolsTab"]?.Controls.OfType<GroupBox>().FirstOrDefault();
-            if (toolsPanel?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault() is { } toolsFlow)
+            var toolsPanel = FindDescendants<GroupBox>(_tabControl.TabPages["ToolsTab"])
+                .FirstOrDefault();
+            if (FindDescendants<FlowLayoutPanel>(toolsPanel).FirstOrDefault() is { } toolsFlow)
                 toolsFlow.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
 
-            var aboutPanel = _tabControl.TabPages["AboutTab"]?.Controls.OfType<GroupBox>().FirstOrDefault();
-            if (aboutPanel?.Controls.OfType<RichTextBox>().FirstOrDefault() is { } aboutText)
+            var aboutPanel = FindDescendants<GroupBox>(_tabControl.TabPages["AboutTab"])
+                .FirstOrDefault();
+            if (FindDescendants<RichTextBox>(aboutPanel).FirstOrDefault() is { } aboutText)
                 aboutText.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         }
 
@@ -2416,7 +2482,7 @@ namespace GelitaITToolkit.Forms
             {
                 var availableWidth = Math.Max(400, tabPage.ClientSize.Width - 20);
 
-                foreach (var groupBox in tabPage.Controls.OfType<GroupBox>())
+                foreach (var groupBox in FindDescendants<GroupBox>(tabPage))
                 {
                     groupBox.Width = availableWidth;
 
@@ -2439,7 +2505,7 @@ namespace GelitaITToolkit.Forms
 
         private void SetGroupAnchor(string tabName, string groupText, AnchorStyles anchor)
         {
-            var group = _tabControl.TabPages[tabName]?.Controls.OfType<GroupBox>()
+            var group = FindDescendants<GroupBox>(_tabControl.TabPages[tabName])
                 .FirstOrDefault(control => control.Text == groupText);
             if (group != null)
                 group.Anchor = anchor;
@@ -2447,7 +2513,7 @@ namespace GelitaITToolkit.Forms
 
         private void SetFlowAnchor(string tabName, AnchorStyles anchor)
         {
-            var flow = _tabControl.TabPages[tabName]?.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+            var flow = FindDescendants<FlowLayoutPanel>(_tabControl.TabPages[tabName]).FirstOrDefault();
             if (flow != null)
                 flow.Anchor = anchor;
         }
@@ -2457,6 +2523,20 @@ namespace GelitaITToolkit.Forms
             var control = Controls.Find(controlName, true).FirstOrDefault();
             if (control != null)
                 control.Anchor = anchor;
+        }
+
+        private static IEnumerable<T> FindDescendants<T>(Control? parent) where T : Control
+        {
+            if (parent == null)
+                yield break;
+
+            foreach (Control child in parent.Controls)
+            {
+                if (child is T match)
+                    yield return match;
+                foreach (var descendant in FindDescendants<T>(child))
+                    yield return descendant;
+            }
         }
 
         private static void ApplyVisualStyle(Control control)
@@ -2537,51 +2617,6 @@ namespace GelitaITToolkit.Forms
             return dialog.ShowDialog(this) == DialogResult.OK ? comboBox.SelectedItem?.ToString() : null;
         }
 
-        private static async Task<bool> RunProcessAsync(
-            string fileName,
-            string arguments,
-            string? workingDirectory = null,
-            TimeSpan? timeout = null)
-        {
-            return await RunProcessWithExitCodeAsync(fileName, arguments, workingDirectory, timeout) == 0;
-        }
-
-        private static async Task<int?> RunProcessWithExitCodeAsync(
-            string fileName,
-            string arguments,
-            string? workingDirectory = null,
-            TimeSpan? timeout = null)
-        {
-            Process? process = null;
-            try
-            {
-                process = Process.Start(new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    Arguments = arguments,
-                    WorkingDirectory = workingDirectory ?? string.Empty,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                });
-                if (process == null)
-                    return null;
-
-                using var timeoutSource = new System.Threading.CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(30));
-                await process.WaitForExitAsync(timeoutSource.Token);
-                return process.ExitCode;
-            }
-            catch
-            {
-                if (process is { HasExited: false })
-                    process.Kill(entireProcessTree: true);
-                return null;
-            }
-            finally
-            {
-                process?.Dispose();
-            }
-        }
-
         private static void AddDashboardReadOnlyField(GroupBox parent, string labelText, string value, string controlName, int x, int y, int valueWidth)
         {
             parent.Controls.Add(new Label
@@ -2603,79 +2638,9 @@ namespace GelitaITToolkit.Forms
             });
         }
 
-        private static (string Name, string DisplayVersion, string FullBuild) GetOperatingSystemInfo()
-        {
-            var fullBuild = Environment.OSVersion.ToString();
-            var displayVersion = "Não identificada";
-            var productName = string.Empty;
-            var currentBuild = Environment.OSVersion.Version.Build;
-
-            try
-            {
-                using var windowsKey = Registry.LocalMachine.OpenSubKey(
-                    @"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
-
-                productName = windowsKey?.GetValue("ProductName")?.ToString() ?? string.Empty;
-                displayVersion = windowsKey?.GetValue("DisplayVersion")?.ToString()
-                    ?? windowsKey?.GetValue("ReleaseId")?.ToString()
-                    ?? displayVersion;
-
-                if (int.TryParse(windowsKey?.GetValue("CurrentBuildNumber")?.ToString(), out var registryBuild))
-                    currentBuild = registryBuild;
-            }
-            catch
-            {
-                // Mantém os valores obtidos do ambiente quando o Registro não estiver disponível.
-            }
-
-            string name;
-            if (currentBuild >= 22000)
-                name = "Windows 11";
-            else if (currentBuild >= 10240)
-                name = "Windows 10";
-            else if (!string.IsNullOrWhiteSpace(productName))
-                name = productName.Replace("Microsoft ", string.Empty, StringComparison.OrdinalIgnoreCase);
-            else
-                name = "Windows";
-
-            return (name, displayVersion, fullBuild);
-        }
-
-        private static HardwareInfo GetHardwareInfo()
-        {
-            var processor = Registry.GetValue(@"HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString", null)?.ToString();
-            var serviceTag = GetSmbiosSystemSerialNumber();
-            var totalMemoryBytes = GetTotalPhysicalMemoryBytes();
-            var processorName = string.IsNullOrWhiteSpace(processor) ? "Não identificado" : processor.Trim();
-            var totalMemory = totalMemoryBytes > 0 ? $"{totalMemoryBytes / 1024d / 1024d / 1024d:0.#} GB" : "Não identificado";
-            var memoryType = "Não identificado";
-            var memorySpeed = "Não identificado";
-
-            var modules = GetSmbiosMemoryModules();
-            if (modules.Count > 0)
-            {
-                var moduleBytes = modules.Aggregate(0UL, (total, module) => total + module.CapacityBytes);
-                if (moduleBytes > 0)
-                    totalMemory = $"{moduleBytes / 1024d / 1024d / 1024d:0.#} GB";
-
-                memoryType = string.Join(" / ", modules.Select(module => GetMemoryTypeName(module.Type)).Distinct());
-                var speeds = modules.Select(module => module.SpeedMHz).Where(speed => speed > 0).Distinct().OrderBy(speed => speed);
-                memorySpeed = speeds.Any() ? string.Join(" / ", speeds.Select(speed => $"{speed} MHz")) : "Não informado";
-            }
-
-            return new HardwareInfo
-            {
-                Processor = processorName,
-                TotalMemory = totalMemory,
-                MemoryType = memoryType,
-                MemorySpeed = memorySpeed,
-                ServiceTag = string.IsNullOrWhiteSpace(serviceTag) ? "Não identificado" : serviceTag.Trim()
-            };
-        }
-
         private async Task LoadDashboardHardwareAsync()
         {
-            var hardware = await Task.Run(GetHardwareInfo);
+            var hardware = await _hardwareInventoryService.GetHardwareAsync();
             SetReadOnlyText("ProcessorTextBox", hardware.Processor);
             SetReadOnlyText("TotalMemoryTextBox", hardware.TotalMemory);
             SetReadOnlyText("MemoryTypeTextBox", hardware.MemoryType);
@@ -2688,184 +2653,6 @@ namespace GelitaITToolkit.Forms
             var textBox = FindControl<TextBox>(controlName);
             if (textBox != null)
                 textBox.Text = value;
-        }
-
-        private static string GetMemoryTypeName(ushort memoryType)
-        {
-            return memoryType switch
-            {
-                20 => "DDR",
-                21 => "DDR2",
-                24 => "DDR3",
-                26 => "DDR4",
-                34 => "DDR5",
-                _ => "Não informado"
-            };
-        }
-
-        private static List<MemoryModuleInfo> GetSmbiosMemoryModules()
-        {
-            const uint rawSmbiosProvider = 0x52534D42; // 'RSMB'
-            var size = GetSystemFirmwareTable(rawSmbiosProvider, 0, IntPtr.Zero, 0);
-            if (size == 0)
-                return new List<MemoryModuleInfo>();
-
-            var buffer = Marshal.AllocHGlobal((int)size);
-            try
-            {
-                if (GetSystemFirmwareTable(rawSmbiosProvider, 0, buffer, size) != size)
-                    return new List<MemoryModuleInfo>();
-
-                var raw = new byte[size];
-                Marshal.Copy(buffer, raw, 0, raw.Length);
-                var modules = new List<MemoryModuleInfo>();
-                var position = 8; // RawSMBIOSData header
-
-                while (position + 4 <= raw.Length)
-                {
-                    var type = raw[position];
-                    var length = raw[position + 1];
-                    if (length < 4 || position + length > raw.Length)
-                        break;
-
-                    if (type == 17 && length >= 23)
-                    {
-                        var sizeField = BitConverter.ToUInt16(raw, position + 12);
-                        ulong capacity = 0;
-                        if (sizeField == 0x7FFF && length >= 32)
-                            capacity = (ulong)BitConverter.ToUInt32(raw, position + 28) * 1024UL * 1024UL;
-                        else if (sizeField != 0 && sizeField != 0xFFFF)
-                            capacity = (sizeField & 0x8000) != 0
-                                ? (ulong)(sizeField & 0x7FFF) * 1024UL
-                                : (ulong)sizeField * 1024UL * 1024UL;
-
-                        if (capacity > 0)
-                        {
-                            var speed = length >= 34 ? BitConverter.ToUInt16(raw, position + 32) : (ushort)0;
-                            if (speed == 0)
-                                speed = BitConverter.ToUInt16(raw, position + 21);
-
-                            modules.Add(new MemoryModuleInfo
-                            {
-                                Type = raw[position + 18],
-                                SpeedMHz = speed,
-                                CapacityBytes = capacity
-                            });
-                        }
-                    }
-
-                    var next = position + length;
-                    while (next + 1 < raw.Length && (raw[next] != 0 || raw[next + 1] != 0))
-                        next++;
-                    position = next + 2;
-                }
-
-                return modules;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
-        }
-
-        private static string? GetSmbiosSystemSerialNumber()
-        {
-            const uint rawSmbiosProvider = 0x52534D42; // 'RSMB'
-            var size = GetSystemFirmwareTable(rawSmbiosProvider, 0, IntPtr.Zero, 0);
-            if (size == 0)
-                return null;
-
-            var buffer = Marshal.AllocHGlobal((int)size);
-            try
-            {
-                if (GetSystemFirmwareTable(rawSmbiosProvider, 0, buffer, size) != size)
-                    return null;
-
-                var raw = new byte[size];
-                Marshal.Copy(buffer, raw, 0, raw.Length);
-                var position = 8; // RawSMBIOSData header
-
-                while (position + 4 <= raw.Length)
-                {
-                    var type = raw[position];
-                    var length = raw[position + 1];
-                    if (length < 4 || position + length > raw.Length)
-                        break;
-
-                    if (type == 1 && length >= 8)
-                    {
-                        var serialNumberIndex = raw[position + 7];
-                        return GetSmbiosString(raw, position + length, serialNumberIndex);
-                    }
-
-                    var next = position + length;
-                    while (next + 1 < raw.Length && (raw[next] != 0 || raw[next + 1] != 0))
-                        next++;
-                    position = next + 2;
-                }
-
-                return null;
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
-        }
-
-        private static string? GetSmbiosString(byte[] raw, int stringAreaStart, byte stringIndex)
-        {
-            if (stringIndex == 0 || stringAreaStart >= raw.Length)
-                return null;
-
-            var currentIndex = 1;
-            var position = stringAreaStart;
-            while (position < raw.Length && raw[position] != 0)
-            {
-                var end = position;
-                while (end < raw.Length && raw[end] != 0)
-                    end++;
-
-                if (currentIndex == stringIndex)
-                    return System.Text.Encoding.ASCII.GetString(raw, position, end - position).Trim();
-
-                currentIndex++;
-                position = end + 1;
-            }
-
-            return null;
-        }
-
-        private static ulong GetTotalPhysicalMemoryBytes()
-        {
-            var memoryStatus = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
-            return GlobalMemoryStatusEx(ref memoryStatus) ? memoryStatus.TotalPhys : 0;
-        }
-
-        private static NetworkInterface? GetPrimaryNetworkInterface()
-        {
-            return NetworkInterface.GetAllNetworkInterfaces()
-                .Where(network => network.OperationalStatus == OperationalStatus.Up &&
-                                  network.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                                  network.GetIPProperties().UnicastAddresses.Any(address =>
-                                      address.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-                                      !IPAddress.IsLoopback(address.Address)))
-                .OrderByDescending(network => network.GetIPProperties().GatewayAddresses.Any(gateway =>
-                    gateway.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork))
-                .FirstOrDefault();
-        }
-
-        private static string GetPrimaryIpAddress()
-        {
-            return GetPrimaryNetworkInterface()?.GetIPProperties().UnicastAddresses
-                .Select(address => address.Address)
-                .FirstOrDefault(address => address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-                                           !IPAddress.IsLoopback(address))?.ToString() ?? "Não conectado";
-        }
-
-        private static string GetPrimaryMacAddress()
-        {
-            var bytes = GetPrimaryNetworkInterface()?.GetPhysicalAddress().GetAddressBytes();
-            return bytes is { Length: > 0 } ? string.Join("-", bytes.Select(value => value.ToString("X2"))) : "Não disponível";
         }
 
         private T? FindControl<T>(string controlName) where T : Control
@@ -3008,7 +2795,10 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA IMPRESSORAS ====
 
-        private async void PrintersUnitComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        private async void PrintersUnitComboBox_SelectedIndexChanged(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersUnitComboBox_SelectedIndexChangedAsync(sender, e));
+
+        private async Task PrintersUnitComboBox_SelectedIndexChangedAsync(object? sender, EventArgs e)
         {
             if (sender is not ComboBox comboBox || comboBox.SelectedItem is not string unitName)
                 return;
@@ -3066,38 +2856,57 @@ namespace GelitaITToolkit.Forms
                 .OfType<Scanner>()
                 .ToList();
 
-        private async void PrintersInstallButton_Click(object? sender, EventArgs e)
+        private async void PrintersInstallButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersInstallButton_ClickAsync(sender, e));
+
+        private async Task PrintersInstallButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-install", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
             if (unit == null || printersList == null || printers.Count == 0)
             {
+                operation.MarkValidationBlocked();
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var installed = await _printerService.InstallMultiplePrinters(printers);
+            var installed = await _printerService.InstallMultiplePrinters(printers, operation.Token);
+            if (!installed) operation.MarkFailed();
             AddLog(installed ? "Impressoras instaladas com sucesso." : "Não foi possível instalar uma ou mais impressoras.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Impressoras instaladas com sucesso." : "Falha ao instalar uma ou mais impressoras.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
 
-        private async void PrintersInstallAllButton_Click(object? sender, EventArgs e)
+        private async void PrintersInstallAllButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersInstallAllButton_ClickAsync(sender, e));
+
+        private async Task PrintersInstallAllButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-install-all", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             if (unit == null)
             {
+                operation.MarkValidationBlocked();
                 MessageBox.Show("Selecione uma unidade.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var installed = await _printerService.InstallAllForUnit(unit);
+            var installed = await _printerService.InstallAllForUnit(unit, operation.Token);
+            if (!installed) operation.MarkFailed();
             AddLog(installed ? $"Impressoras da unidade {unit.Name} instaladas." : $"Falha ao instalar as impressoras da unidade {unit.Name}.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Instalação concluída." : "A instalação não foi concluída. Verifique a rede e o log.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
 
-        private async void PrintersRemoveButton_Click(object? sender, EventArgs e)
+        private async void PrintersRemoveButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersRemoveButton_ClickAsync(sender, e));
+
+        private async Task PrintersRemoveButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-remove", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var printers = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
@@ -3108,27 +2917,37 @@ namespace GelitaITToolkit.Forms
             }
 
             var removed = printers.Count == printersList.Rows.Count
-                ? await _printerService.RemoveAllForUnit(unit)
+                ? await _printerService.RemoveAllForUnit(unit, operation.Token)
                 : true;
 
             if (printers.Count != printersList.Rows.Count)
             {
                 foreach (var printer in printers)
-                    removed &= await _printerService.RemovePrinter(printer.Name, unit);
+                    removed &= await _printerService.RemovePrinter(printer.Name, unit, operation.Token);
             }
+
+            if (!removed) operation.MarkFailed();
 
             AddLog(removed ? "Impressoras removidas com sucesso." : "Não foi possível remover uma ou mais impressoras.", removed ? LogLevel.Info : LogLevel.Error);
         }
 
-        private async void PrintersRefreshButton_Click(object? sender, EventArgs e)
+        private async void PrintersRefreshButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersRefreshButton_ClickAsync(sender, e));
+
+        private async Task PrintersRefreshButton_ClickAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
             if (unit != null)
                 await LoadPrintersForUnitAsync(unit.Name);
         }
 
-        private async void PrintersPingButton_Click(object? sender, EventArgs e)
+        private async void PrintersPingButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersPingButton_ClickAsync(sender, e));
+
+        private async Task PrintersPingButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-ping", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
@@ -3162,17 +2981,25 @@ namespace GelitaITToolkit.Forms
             }
 
             var summary = string.Join(Environment.NewLine, results);
+            if (results.Any(result => result.Contains("falha", StringComparison.OrdinalIgnoreCase) ||
+                                      result.Contains("não configurado", StringComparison.OrdinalIgnoreCase)))
+                operation.MarkFailed();
             AddLog($"Teste de ping de impressoras concluído. {summary.Replace(Environment.NewLine, " | ")}", LogLevel.Info);
             MessageBox.Show(summary, "Teste de Ping das Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private async void PrintersSetDefaultButton_Click(object? sender, EventArgs e)
+        private async void PrintersSetDefaultButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersSetDefaultButton_ClickAsync(sender, e));
+
+        private async Task PrintersSetDefaultButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-set-default", sender);
+            if (operation == null) return;
             var printer = GetSingleCheckedPrinter("definir como padrão");
             if (printer == null)
                 return;
 
-            var success = await _printerService.SetDefaultPrinter(printer);
+            var success = await _printerService.SetDefaultPrinter(printer, operation.Token);
             AddLog(
                 success ? $"{printer.Name} definida como impressora padrão." : $"Não foi possível definir {printer.Name} como padrão.",
                 success ? LogLevel.Info : LogLevel.Error);
@@ -3183,13 +3010,18 @@ namespace GelitaITToolkit.Forms
                 success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void PrintersTestPageButton_Click(object? sender, EventArgs e)
+        private async void PrintersTestPageButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersTestPageButton_ClickAsync(sender, e));
+
+        private async Task PrintersTestPageButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-test-page", sender);
+            if (operation == null) return;
             var printer = GetSingleCheckedPrinter("imprimir uma página de teste");
             if (printer == null)
                 return;
 
-            var success = await _printerService.PrintTestPage(printer);
+            var success = await _printerService.PrintTestPage(printer, operation.Token);
             AddLog(
                 success ? $"Página de teste enviada para {printer.Name}." : $"Falha ao enviar página de teste para {printer.Name}.",
                 success ? LogLevel.Info : LogLevel.Error);
@@ -3200,8 +3032,13 @@ namespace GelitaITToolkit.Forms
                 success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void PrintersPort9100Button_Click(object? sender, EventArgs e)
+        private async void PrintersPort9100Button_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersPort9100Button_ClickAsync(sender, e));
+
+        private async Task PrintersPort9100Button_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-port-test", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
@@ -3221,17 +3058,26 @@ namespace GelitaITToolkit.Forms
                     continue;
                 }
 
-                var open = await _printerService.TestRawPrintPortAsync(ipAddress);
+                operation.Token.ThrowIfCancellationRequested();
+                var open = await _printerService.TestRawPrintPortAsync(ipAddress, cancellationToken: operation.Token);
                 results.Add($"{printer.Name} ({ipAddress}): porta 9100 {(open ? "aberta" : "fechada ou indisponível")}.");
             }
 
             var summary = string.Join(Environment.NewLine, results);
+            if (results.Any(result => result.Contains("fechada", StringComparison.OrdinalIgnoreCase) ||
+                                      result.Contains("não identificado", StringComparison.OrdinalIgnoreCase)))
+                operation.MarkFailed();
             AddLog($"Teste da porta 9100 concluído. {summary.Replace(Environment.NewLine, " | ")}", LogLevel.Info);
             MessageBox.Show(summary, "Teste da Porta 9100", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private async void PrintersRemoveDuplicatesButton_Click(object? sender, EventArgs e)
+        private async void PrintersRemoveDuplicatesButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersRemoveDuplicatesButton_ClickAsync(sender, e));
+
+        private async Task PrintersRemoveDuplicatesButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-remove-duplicates", sender);
+            if (operation == null) return;
             var duplicates = _printerService.FindDuplicateInstalledPrinters();
             if (duplicates.Count == 0)
             {
@@ -3247,7 +3093,7 @@ namespace GelitaITToolkit.Forms
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            var removed = await _printerService.RemoveDuplicateInstalledPrinters();
+            var removed = await _printerService.RemoveDuplicateInstalledPrinters(operation.Token);
             AddLog($"{removed} impressora(s) duplicada(s) removida(s).", LogLevel.Info);
             MessageBox.Show($"{removed} impressora(s) duplicada(s) removida(s).", "Impressoras Duplicadas", MessageBoxButtons.OK, MessageBoxIcon.Information);
             var unit = GetSelectedUnit();
@@ -3268,8 +3114,13 @@ namespace GelitaITToolkit.Forms
             return printers[0];
         }
 
-        private async void PrintersAddButton_Click(object? sender, EventArgs e)
+        private async void PrintersAddButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => PrintersAddButton_ClickAsync(sender, e));
+
+        private async Task PrintersAddButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-add", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             if (unit == null)
             {
@@ -3282,15 +3133,21 @@ namespace GelitaITToolkit.Forms
                 return;
 
             var printer = new Printer(printerName.Trim(), unit.PrintServer, printerName.Trim(), unit.Name, string.Empty);
-            var installed = await _printerService.InstallPrinter(printer);
+            var installed = await _printerService.InstallPrinter(printer, operation.Token);
             AddLog(installed ? $"Impressora {printerName} instalada." : $"Falha ao instalar {printerName}.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Impressora instalada com sucesso." : "Não foi possível instalar a impressora.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
 
         // ==== ABA SCANNERS ====
 
-        private void ScannersAddButton_Click(object? sender, EventArgs e)
+        private async void ScannersAddButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ScannersAddButton_ClickAsync(sender, e));
+
+        private async Task ScannersAddButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("scanner-add", sender);
+            if (operation == null) return;
+            await Task.Yield();
             var modelCombo = FindControl<ComboBox>("ScannersModelComboBox");
             var printersList = FindControl<DataGridView>("ScannersPrintersCheckedListBox");
             var ipBox = FindControl<TextBox>("ScannersIPTextBox");
@@ -3308,13 +3165,14 @@ namespace GelitaITToolkit.Forms
                 return;
             }
 
-            var epsonService = new ScannerService();
-            var naps2Service = new Naps2ProfileService();
+            var epsonService = _scannerService;
+            var naps2Service = _naps2ProfileService;
             var added = new List<string>();
             var failed = new List<string>();
 
             foreach (var printerOption in printerOptions)
             {
+                operation.Token.ThrowIfCancellationRequested();
                 var printerName = printerOption.PrinterName;
                 var scannerModel = printerOption.ScannerModel ?? model;
                 var ipAddress = printerOptions.Count == 1 && !string.IsNullOrWhiteSpace(manualIpAddress)
@@ -3328,7 +3186,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 var scanner = new Scanner(scannerModel, ipAddress, printerName, printerName, string.Empty, printerName, Guid.NewGuid().ToString("B"));
-                if (!epsonService.TryConfigureEpsonScanner(scanner, out var epsonMessage))
+                if (!epsonService.TryConfigureEpsonScanner(scanner, out var epsonMessage, operation.Token))
                 {
                     failed.Add($"{printerName}: {epsonMessage}");
                     AddLog(epsonMessage, LogLevel.Warning);
@@ -3336,7 +3194,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 AddLog(epsonMessage, LogLevel.Info);
-                if (!naps2Service.TryAddOrUpdateEpsonProfile(scanner, out var naps2Message))
+                if (!naps2Service.TryAddOrUpdateEpsonProfile(scanner, out var naps2Message, operation.Token))
                 {
                     failed.Add($"{printerName}: Epson configurado, mas houve falha no NAPS2: {naps2Message}");
                     AddLog(naps2Message, LogLevel.Warning);
@@ -3344,7 +3202,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 AddLog(naps2Message, LogLevel.Info);
-                var validationFailures = new ScannerValidationService()
+                var validationFailures = _scannerValidationService
                     .Validate(scanner)
                     .Where(result => !result.Success)
                     .Select(result => $"{result.Item}: {result.Details}")
@@ -3365,7 +3223,7 @@ namespace GelitaITToolkit.Forms
             }
 
             if (added.Count > 0)
-                PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+                PopulateScannersList(epsonService.GetConfiguredEpsonScanners(operation.Token));
 
             var message = $"Adicionados ({added.Count}):\n{string.Join(Environment.NewLine, added)}";
             if (failed.Count > 0)
@@ -3375,8 +3233,14 @@ namespace GelitaITToolkit.Forms
             MessageBox.Show(message, "Adicionar Scanners", MessageBoxButtons.OK, failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private void ScannersRemoveButton_Click(object? sender, EventArgs e)
+        private async void ScannersRemoveButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ScannersRemoveButton_ClickAsync(sender, e));
+
+        private async Task ScannersRemoveButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("scanner-remove", sender);
+            if (operation == null) return;
+            await Task.Yield();
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var selectedScanners = scannersList == null ? new List<Scanner>() : GetSelectedScanners(scannersList);
             if (selectedScanners.Count == 0)
@@ -3395,12 +3259,13 @@ namespace GelitaITToolkit.Forms
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            var epsonService = new ScannerService();
+            var epsonService = _scannerService;
             var removedFromEpson = new List<string>();
             var failedInEpson = new List<string>();
             foreach (var scanner in selectedScanners)
             {
-                if (epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var epsonMessage))
+                operation.Token.ThrowIfCancellationRequested();
+                if (epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var epsonMessage, operation.Token))
                 {
                     removedFromEpson.Add(scanner.Name);
                     AddLog(epsonMessage, LogLevel.Info);
@@ -3412,10 +3277,10 @@ namespace GelitaITToolkit.Forms
                 }
             }
 
-            var naps2Service = new Naps2ProfileService();
-            var removedFromNaps2 = naps2Service.TryRemoveEpsonProfiles(selectedScanners, out var naps2Message);
+            var naps2Service = _naps2ProfileService;
+            var removedFromNaps2 = naps2Service.TryRemoveEpsonProfiles(selectedScanners, out var naps2Message, operation.Token);
             AddLog(naps2Message, removedFromNaps2 ? LogLevel.Info : LogLevel.Error);
-            PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+            PopulateScannersList(epsonService.GetConfiguredEpsonScanners(operation.Token));
 
             var resultMessage =
                 $"Removidos do Epson Scan 2: {removedFromEpson.Count}.\n" +
@@ -3430,8 +3295,14 @@ namespace GelitaITToolkit.Forms
                 failedInEpson.Count == 0 && removedFromNaps2 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private void ScannersRemoveDuplicatesButton_Click(object? sender, EventArgs e)
+        private async void ScannersRemoveDuplicatesButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ScannersRemoveDuplicatesButton_ClickAsync(sender, e));
+
+        private async Task ScannersRemoveDuplicatesButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("scanner-remove-duplicates", sender);
+            if (operation == null) return;
+            await Task.Yield();
             if (MessageBox.Show(
                     "O Toolkit removerá conexões repetidas pelo mesmo IP no Epson Scan 2 e perfis repetidos pelo mesmo nome no NAPS2. Backups serão criados antes das alterações.\n\nDeseja continuar?",
                     "Limpar Scanners Duplicados",
@@ -3439,14 +3310,14 @@ namespace GelitaITToolkit.Forms
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            var epsonService = new ScannerService();
-            var epsonSuccess = epsonService.TryRemoveDuplicateEpsonScanners(out var epsonMessage);
-            var naps2Service = new Naps2ProfileService();
-            var naps2Success = naps2Service.TryRemoveDuplicateProfiles(out var naps2Message);
+            var epsonService = _scannerService;
+            var epsonSuccess = epsonService.TryRemoveDuplicateEpsonScanners(out var epsonMessage, operation.Token);
+            var naps2Service = _naps2ProfileService;
+            var naps2Success = naps2Service.TryRemoveDuplicateProfiles(out var naps2Message, operation.Token);
 
             AddLog(epsonMessage, epsonSuccess ? LogLevel.Info : LogLevel.Error);
             AddLog(naps2Message, naps2Success ? LogLevel.Info : LogLevel.Error);
-            PopulateScannersList(epsonService.GetConfiguredEpsonScanners());
+            PopulateScannersList(epsonService.GetConfiguredEpsonScanners(operation.Token));
 
             MessageBox.Show(
                 $"{epsonMessage}\n\n{naps2Message}",
@@ -3455,7 +3326,10 @@ namespace GelitaITToolkit.Forms
                 epsonSuccess && naps2Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void ScannersPingButton_Click(object? sender, EventArgs e)
+        private async void ScannersPingButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ScannersPingButton_ClickAsync(sender, e));
+
+        private async Task ScannersPingButton_ClickAsync(object? sender, EventArgs e)
         {
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var scanner = scannersList == null ? null : GetSelectedScanners(scannersList).FirstOrDefault();
@@ -3483,9 +3357,14 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async void ScannersValidateEpsonButton_Click(object? sender, EventArgs e)
+        private async void ScannersValidateEpsonButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ScannersValidateEpsonButton_ClickAsync(sender, e));
+
+        private async Task ScannersValidateEpsonButton_ClickAsync(object? sender, EventArgs e)
         {
-            var epsonService = new ScannerService();
+            using var operation = BeginOperation("scanner-validation", sender);
+            if (operation == null) return;
+            var epsonService = _scannerService;
             var scanners = epsonService.GetConfiguredEpsonScanners();
             if (scanners.Count == 0)
             {
@@ -3563,7 +3442,7 @@ namespace GelitaITToolkit.Forms
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Question) == DialogResult.Yes)
                 {
-                    var naps2Service = new Naps2ProfileService();
+                    var naps2Service = _naps2ProfileService;
                     var added = new List<string>();
                     var failed = new List<string>();
                     foreach (var scanner in scanners)
@@ -3743,8 +3622,13 @@ namespace GelitaITToolkit.Forms
             return installedSoftware;
         }
 
-        private async void InstallationsInstallButton_Click(object? sender, EventArgs e)
+        private async void InstallationsInstallButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => InstallationsInstallButton_ClickAsync(sender, e));
+
+        private async Task InstallationsInstallButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("software-installation", sender);
+            if (operation == null) return;
             var installButton = FindControl<Button>("InstallationsInstallButton");
             var executeAllButton = FindControl<Button>("InstallationsExecuteAllButton");
             try
@@ -3758,7 +3642,9 @@ namespace GelitaITToolkit.Forms
                 _installationsProgressBar.MarqueeAnimationSpeed = 25;
                 _installationsProgressLabel.Text = "Executando instalações...";
 
-                await ExecuteSelectedInstallationsAsync();
+                await ExecuteSelectedInstallationsAsync(operation.Token);
+                if (_installationErrors.Count > 0)
+                    operation.MarkFailed();
             }
             finally
             {
@@ -3769,12 +3655,14 @@ namespace GelitaITToolkit.Forms
                     installButton.Enabled = true;
                 if (executeAllButton != null)
                     executeAllButton.Enabled = true;
-                await RefreshInstallationStatusesAsync();
+                if (!operation.Token.IsCancellationRequested)
+                    await RefreshInstallationStatusesAsync();
             }
         }
 
-        private async Task ExecuteSelectedInstallationsAsync()
+        private async Task ExecuteSelectedInstallationsAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var napsCheckbox = FindControl<CheckBox>("InstallNapsCheckbox");
             var epsonCheckbox = FindControl<CheckBox>("InstallEpsonScanCheckbox");
             var sentinelOneCheckbox = FindControl<CheckBox>("InstallSentinelOneCheckbox");
@@ -3792,6 +3680,7 @@ namespace GelitaITToolkit.Forms
 
             if (epsonCheckbox?.Checked == true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var model = PromptForOption("Driver Epson + Epson Scan 2", "Selecione o modelo da impressora/scanner:", "Epson WF-C5899", "Epson WF-M5899");
                 if (model != null)
                 {
@@ -3820,7 +3709,7 @@ namespace GelitaITToolkit.Forms
                     }
                     else
                     {
-                        var installed = await RunProcessAsync(installer, epsonProgram.Arguments);
+                        var installed = await RunProcessAsync(installer, epsonProgram.Arguments, cancellationToken: cancellationToken);
                         AddLog(installed
                             ? $"Driver Epson e Epson Scan 2 instalados para {model}."
                             : $"A instalação silenciosa do driver Epson retornou falha para {model}.",
@@ -3834,6 +3723,7 @@ namespace GelitaITToolkit.Forms
 
             if (napsCheckbox?.Checked == true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var napsProgram = GetProgramDefinition("naps2");
                 var napsDirectory = GetConfiguredPath(napsProgram.PathKey);
                 var installer = Directory.Exists(napsDirectory)
@@ -3858,8 +3748,8 @@ namespace GelitaITToolkit.Forms
                 }
 
                 var installed = Path.GetExtension(installer).Equals(".msi", StringComparison.OrdinalIgnoreCase)
-                    ? await RunProcessAsync("msiexec.exe", $"/i \"{installer}\" {napsProgram.Arguments}")
-                    : await RunProcessAsync(installer, napsProgram.Arguments);
+                    ? await RunProcessAsync("msiexec.exe", $"/i \"{installer}\" {napsProgram.Arguments}", cancellationToken: cancellationToken)
+                    : await RunProcessAsync(installer, napsProgram.Arguments, cancellationToken: cancellationToken);
 
                 AddLog(installed
                     ? "Instalação silenciosa do NAPS2 concluída."
@@ -3872,6 +3762,7 @@ namespace GelitaITToolkit.Forms
 
             if (sentinelOneCheckbox?.Checked == true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var sentinelProgram = GetProgramDefinition("sentinelOne");
                 var sentinelOneDirectory = GetConfiguredPath(sentinelProgram.PathKey);
                 var installer = Directory.Exists(sentinelOneDirectory)
@@ -3898,7 +3789,7 @@ namespace GelitaITToolkit.Forms
                     return;
                 }
 
-                var installed = await RunProcessAsync("cmd.exe", $"/c \"\"{installer}\"\"", sentinelOneDirectory);
+                var installed = await RunProcessAsync("cmd.exe", $"/c \"\"{installer}\"\"", sentinelOneDirectory, cancellationToken: cancellationToken);
                 AddLog(installed
                     ? "Instalação do SentinelOne concluída pelo script corporativo."
                     : "O script de instalação do SentinelOne retornou falha.",
@@ -3910,6 +3801,7 @@ namespace GelitaITToolkit.Forms
 
             if (officeCheckbox?.Checked == true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var officeProgram = GetProgramDefinition("office");
                 var odtDirectory = GetConfiguredPath(officeProgram.PathKey);
                 var setupPath = Path.Combine(odtDirectory, officeProgram.InstallerPattern);
@@ -3954,7 +3846,7 @@ namespace GelitaITToolkit.Forms
                 }
 
                 AddLog("Iniciando instalação do Microsoft Office pelo ODT.", LogLevel.Info);
-                var installed = await RunProcessAsync(setupPath, officeProgram.Arguments, odtDirectory);
+                var installed = await RunProcessAsync(setupPath, officeProgram.Arguments, odtDirectory, cancellationToken: cancellationToken);
                 AddLog(
                     installed
                         ? "Instalação do Microsoft Office concluída pelo ODT."
@@ -3972,6 +3864,7 @@ namespace GelitaITToolkit.Forms
 
             if (paloAltoCheckbox?.Checked == true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var paloAltoProgram = GetProgramDefinition("paloAlto");
                 var paloAltoDirectory = GetConfiguredPath(paloAltoProgram.PathKey);
                 var installer = Path.Combine(paloAltoDirectory, paloAltoProgram.InstallerPattern);
@@ -4002,7 +3895,8 @@ namespace GelitaITToolkit.Forms
                 var exitCode = await RunProcessWithExitCodeAsync(
                     "msiexec.exe",
                     $"/i \"{installer}\" {paloAltoProgram.Arguments}",
-                    paloAltoDirectory);
+                    paloAltoDirectory,
+                    cancellationToken: cancellationToken);
                 var installed = exitCode is 0 or 1641 or 3010 or 1638;
                 var requiresRestart = exitCode is 1641 or 3010;
                 var alreadyInstalled = exitCode == 1638;
@@ -4033,8 +3927,13 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA CITRIX ====
 
-        private async void CitrixAddStoreButton_Click(object? sender, EventArgs e)
+        private async void CitrixAddStoreButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => CitrixAddStoreButton_ClickAsync(sender, e));
+
+        private async Task CitrixAddStoreButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("citrix-configuration", sender);
+            if (operation == null) return;
             if (_isConfiguringCitrix)
                 return;
 
@@ -4044,10 +3943,11 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                await ConfigureSelectedCitrixStoresAsync();
+                await ConfigureSelectedCitrixStoresAsync(operation.Token);
             }
             catch (Exception ex)
             {
+                operation.MarkFailed();
                 AddLog($"Falha inesperada ao configurar o Citrix: {ex.Message}", LogLevel.Error);
                 UpdateStatusLabel("Falha ao configurar as contas Citrix.");
                 MessageBox.Show(
@@ -4064,10 +3964,9 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async Task ConfigureSelectedCitrixStoresAsync()
+        private async Task ConfigureSelectedCitrixStoresAsync(CancellationToken cancellationToken)
         {
-            var selfServicePath = FindCitrixSelfServiceExecutable();
-            var storeBrowsePath = FindCitrixStoreBrowseExecutable();
+            var selfServicePath = _citrixService.FindSelfServiceExecutable();
             if (selfServicePath == null)
             {
                 AddLog("Citrix Workspace ou Storebrowse não encontrado.", LogLevel.Warning);
@@ -4095,69 +3994,21 @@ namespace GelitaITToolkit.Forms
                 return;
             }
 
-            var selfServiceWorkingDirectory = Path.GetDirectoryName(selfServicePath);
-            var removalTimeout = TimeSpan.FromSeconds(8);
-            var additionTimeout = TimeSpan.FromSeconds(30);
-
             UpdateStatusLabel($"Configurando {string.Join(" e ", selectedStores.Select(store => store.Name))}...");
+            var result = await _citrixService.ConfigureAsync(managedStores, selectedStores, cancellationToken);
+            var configuredStores = result.ConfiguredStores;
+            var friendlyNamesApplied = result.FriendlyNamesApplied;
+            var configured = result.Succeeded;
 
-            // Remove registros invisíveis criados por versões que usavam o
-            // Storebrowse independente em vez do cadastro do Self-Service.
-            if (storeBrowsePath != null)
-            {
-                var storeBrowseWorkingDirectory = Path.GetDirectoryName(storeBrowsePath);
-                foreach (var store in managedStores)
-                {
-                    foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
-                    {
-                        await RunProcessAsync(
-                            storeBrowsePath,
-                            $"-d \"{storeUrl}\"",
-                            storeBrowseWorkingDirectory,
-                            removalTimeout);
-                    }
-                }
-            }
-
-            // Remove somente as contas gerenciadas pelo Toolkit. Depois adiciona
-            // apenas as marcadas; quando ambas são escolhidas, CitrixBR vem primeiro.
-            for (var storeIndex = managedStores.Length - 1; storeIndex >= 0; storeIndex--)
-            {
-                var store = managedStores[storeIndex];
-                foreach (var storeUrl in GetCitrixStoreRemovalUrls(store))
-                {
-                    await RunProcessAsync(
-                        selfServicePath,
-                        $"storebrowse -d \"{storeUrl}\"",
-                        selfServiceWorkingDirectory,
-                        removalTimeout);
-                }
-            }
-
-            var configuredStores = new List<string>();
             foreach (var store in selectedStores)
             {
-                var added = await RunProcessAsync(
-                    selfServicePath,
-                    $"storebrowse -a \"{store.DiscoveryUrl}\"",
-                    selfServiceWorkingDirectory,
-                    additionTimeout);
-
+                var added = configuredStores.Contains(store.Name, StringComparer.OrdinalIgnoreCase);
                 AddLog(
                     added
                         ? $"Conta Citrix adicionada: {store.Name}{(store.IsPrimary ? " (principal)" : string.Empty)}."
                         : $"Falha ao adicionar a conta Citrix: {store.Name}.",
                     added ? LogLevel.Info : LogLevel.Error);
-
-                if (added)
-                    configuredStores.Add(store.Name);
             }
-
-            var friendlyNamesApplied = configuredStores.Count == selectedStores.Length &&
-                await ApplyCitrixFriendlyNamesAsync(selectedStores);
-            var configured =
-                configuredStores.Count == selectedStores.Length &&
-                friendlyNamesApplied;
             if (!friendlyNamesApplied && configuredStores.Count == selectedStores.Length)
                 AddLog("As contas Citrix foram adicionadas, mas os nomes amigáveis não puderam ser atualizados.", LogLevel.Error);
 
@@ -4186,112 +4037,9 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private static async Task<bool> ApplyCitrixFriendlyNamesAsync(
-            IReadOnlyCollection<CitrixStoreOption> selectedStores)
-        {
-            const string sitesRegistryPath = @"Software\Citrix\Dazzle\Sites";
-            const string accountsRegistryPath = @"Software\Citrix\Receiver\CtxAccount";
-            var primaryStore =
-                selectedStores.FirstOrDefault(store => store.IsPrimary) ??
-                selectedStores.First();
-
-            // O Self-Service pode encerrar antes de terminar de persistir as chaves.
-            // Aguarda alguns instantes para aplicar os nomes na fonte usada pela
-            // janela "Adicionar ou remover contas".
-            for (var attempt = 0; attempt < 12; attempt++)
-            {
-                var matchedStores = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                using (var sitesKey = Registry.CurrentUser.OpenSubKey(sitesRegistryPath, writable: true))
-                {
-                    if (sitesKey != null)
-                    {
-                        foreach (var siteKeyName in sitesKey.GetSubKeyNames())
-                        {
-                            using var siteKey = sitesKey.OpenSubKey(siteKeyName, writable: true);
-                            var configUrl = siteKey?.GetValue("configUrl")?.ToString();
-                            var store = selectedStores.FirstOrDefault(candidate =>
-                                CitrixUrlsMatch(candidate.DiscoveryUrl, configUrl));
-                            if (siteKey == null || store == null)
-                                continue;
-
-                            siteKey.SetValue("name", store.Name, RegistryValueKind.String);
-                            siteKey.SetValue("StoreName", store.Name, RegistryValueKind.String);
-                            siteKey.SetValue(
-                                "IsPrimary",
-                                ReferenceEquals(store, primaryStore) ? "True" : "False",
-                                RegistryValueKind.String);
-                            matchedStores.Add(store.Name);
-                        }
-                    }
-                }
-
-                using (var accountsKey = Registry.CurrentUser.OpenSubKey(accountsRegistryPath, writable: true))
-                {
-                    if (accountsKey != null)
-                    {
-                        foreach (var accountKeyName in accountsKey.GetSubKeyNames())
-                        {
-                            using var accountKey = accountsKey.OpenSubKey(accountKeyName, writable: true);
-                            var accountName = accountKey?.GetValue("Name")?.ToString();
-                            var store = selectedStores.FirstOrDefault(candidate =>
-                                string.Equals(candidate.Name, accountName, StringComparison.OrdinalIgnoreCase));
-                            if (accountKey == null || store == null)
-                                continue;
-
-                            accountKey.SetValue("Name", store.Name, RegistryValueKind.String);
-                            accountKey.SetValue("Description", store.Name, RegistryValueKind.String);
-                            accountKey.SetValue(
-                                "IsPrimary",
-                                ReferenceEquals(store, primaryStore) ? "true" : "false",
-                                RegistryValueKind.String);
-                        }
-                    }
-                }
-
-                if (matchedStores.Count == selectedStores.Count)
-                    return true;
-
-                await Task.Delay(300);
-            }
-
-            return false;
-        }
-
-        private static bool CitrixUrlsMatch(string expectedUrl, string? actualUrl)
-        {
-            if (string.IsNullOrWhiteSpace(actualUrl))
-                return false;
-
-            return string.Equals(
-                expectedUrl.TrimEnd('/'),
-                actualUrl.TrimEnd('/'),
-                StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static IEnumerable<string> GetCitrixStoreRemovalUrls(CitrixStoreOption store)
-        {
-            yield return store.DiscoveryUrl;
-
-            // Limpa também contas criadas pelas versões intermediárias do Toolkit,
-            // que trocaram a URL de discovery por "servidor?NomeDaLoja".
-            if (Uri.TryCreate(store.DiscoveryUrl, UriKind.Absolute, out var uri) &&
-                string.IsNullOrEmpty(uri.Query))
-            {
-                var legacyUrl =
-                    $"{uri.GetLeftPart(UriPartial.Authority)}?{Uri.EscapeDataString(store.Name)}";
-                if (!string.Equals(legacyUrl, store.DiscoveryUrl, StringComparison.OrdinalIgnoreCase))
-                    yield return legacyUrl;
-
-                // A configuração antiga da CitrixEB utilizava apenas a raiz.
-                if (store.Name == "CitrixEB" && uri.AbsolutePath != "/")
-                    yield return uri.GetLeftPart(UriPartial.Authority);
-            }
-        }
-
         private void CitrixOpenWorkspaceButton_Click(object? sender, EventArgs e)
         {
-            var selfServicePath = FindCitrixSelfServiceExecutable();
+            var selfServicePath = _citrixService.FindSelfServiceExecutable();
             if (selfServicePath == null)
             {
                 MessageBox.Show("O Citrix Workspace nÃ£o foi encontrado neste computador.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -4300,12 +4048,7 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = selfServicePath,
-                    WorkingDirectory = Path.GetDirectoryName(selfServicePath) ?? string.Empty,
-                    UseShellExecute = true
-                });
+                _citrixService.OpenWorkspace();
                 AddLog("Citrix Workspace aberto.", LogLevel.Info);
             }
             catch (Exception ex)
@@ -4315,36 +4058,20 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private static string? FindCitrixSelfServiceExecutable()
-        {
-            var candidates = new[]
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Citrix", "ICA Client", "SelfServicePlugin", "SelfService.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Citrix", "ICA Client", "SelfServicePlugin", "SelfService.exe")
-            };
-
-            return candidates.FirstOrDefault(File.Exists);
-        }
-
-        private static string? FindCitrixStoreBrowseExecutable()
-        {
-            var candidates = new[]
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Citrix", "ICA Client", "AuthManager", "storebrowse.exe")
-            };
-
-            return candidates.FirstOrDefault(File.Exists);
-        }
-
         // ==== ABA FERRAMENTAS ====
 
-        private async void ToolsWindows25H2Button_Click(object? sender, EventArgs e)
+        private async void ToolsWindows25H2Button_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsWindows25H2Button_ClickAsync(sender, e));
+
+        private async Task ToolsWindows25H2Button_ClickAsync(object? sender, EventArgs e)
         {
-            var updateService = new WindowsFeatureUpdateService();
+            using var operation = BeginOperation("windows-feature-update", sender);
+            if (operation == null) return;
+            var updateService = _windowsFeatureUpdateService;
             var eligibility = updateService.GetEligibility();
             if (!eligibility.CanInstall)
             {
+                operation.MarkValidationBlocked();
                 var reason = WindowsFeatureUpdateService.BuildEligibilityFailureMessage(eligibility);
                 AddLog($"Atualização para Windows 11 25H2 não iniciada: {reason}", LogLevel.Warning);
                 MessageBox.Show(
@@ -4423,7 +4150,7 @@ namespace GelitaITToolkit.Forms
 
         private void ToolsValidateScannersButton_Click(object? sender, EventArgs e)
         {
-            var scannerService = new ScannerService();
+            var scannerService = _scannerService;
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var scanners = scannersList == null ? null : GetSelectedScanners(scannersList);
             if (scanners == null || scanners.Count == 0)
@@ -4434,7 +4161,7 @@ namespace GelitaITToolkit.Forms
                 return;
             }
 
-            var validator = new ScannerValidationService();
+            var validator = _scannerValidationService;
             var results = scanners.SelectMany(scanner =>
                 new[] { $"[{scanner.Name} — {scanner.IpAddress}]" }
                     .Concat(validator.Validate(scanner).Select(result => result.ToString()))).ToList();
@@ -4445,8 +4172,13 @@ namespace GelitaITToolkit.Forms
                 success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void ToolsRealScanTestButton_Click(object? sender, EventArgs e)
+        private async void ToolsRealScanTestButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsRealScanTestButton_ClickAsync(sender, e));
+
+        private async Task ToolsRealScanTestButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("real-scan-test", sender);
+            if (operation == null) return;
             var scannersList = FindControl<DataGridView>("ScannersListBox");
             var selectedScanners = scannersList == null ? new List<Scanner>() : GetSelectedScanners(scannersList);
             if (selectedScanners.Count != 1)
@@ -4468,14 +4200,27 @@ namespace GelitaITToolkit.Forms
                 Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                 "Testes Scanner");
             using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-            var result = await new ScannerValidationService().RunRealScanTestAsync(scanner, outputDirectory, timeout.Token);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, operation.Token);
+            var result = await _scannerValidationService.RunRealScanTestAsync(scanner, outputDirectory, cancellation.Token);
+            if (!result.Success)
+            {
+                if (timeout.IsCancellationRequested && !operation.Token.IsCancellationRequested)
+                    operation.MarkTimedOut();
+                else
+                    operation.MarkFailed();
+            }
             AddLog(result.ToString(), result.Success ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(result.Details, result.Item, MessageBoxButtons.OK,
                 result.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void ToolsPrinterConnectivityButton_Click(object? sender, EventArgs e)
+        private async void ToolsPrinterConnectivityButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsPrinterConnectivityButton_ClickAsync(sender, e));
+
+        private async Task ToolsPrinterConnectivityButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("printer-connectivity", sender);
+            if (operation == null) return;
             var unit = GetSelectedUnit();
             var printersList = FindControl<DataGridView>("PrintersCheckedListBox");
             var selectedPrinters = printersList == null ? new List<Printer>() : GetCheckedPrinters(printersList);
@@ -4488,6 +4233,7 @@ namespace GelitaITToolkit.Forms
             var results = new List<string>();
             foreach (var printer in selectedPrinters)
             {
+                operation.Token.ThrowIfCancellationRequested();
                 var ip = GetScannerIpForPrinter(unit, printer.Name);
                 if (string.IsNullOrWhiteSpace(ip))
                 {
@@ -4495,8 +4241,8 @@ namespace GelitaITToolkit.Forms
                     continue;
                 }
 
-                var port = await _printerService.TestRawPrintPortAsync(ip);
-                var web = await _printerService.TestDeviceWebPageAsync(ip);
+                var port = await _printerService.TestRawPrintPortAsync(ip, cancellationToken: operation.Token);
+                var web = await _printerService.TestDeviceWebPageAsync(ip, cancellationToken: operation.Token);
                 results.Add(
                     $"{(port && web.Url != null ? "✓" : "⚠")} {printer.Name} ({ip}): " +
                     $"porta 9100 {(port ? "aberta" : "indisponível")}; página web {(web.Url ?? "indisponível")}.");
@@ -4507,8 +4253,13 @@ namespace GelitaITToolkit.Forms
             MessageBox.Show(summary, "Conectividade das Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private async void ToolsRepairOfflinePrintersButton_Click(object? sender, EventArgs e)
+        private async void ToolsRepairOfflinePrintersButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsRepairOfflinePrintersButton_ClickAsync(sender, e));
+
+        private async Task ToolsRepairOfflinePrintersButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("offline-printer-repair", sender);
+            if (operation == null) return;
             if (MessageBox.Show(
                     "O Toolkit limpará trabalhos com erro, desmarcará o modo offline e reiniciará o spooler. Continuar?",
                     "Corrigir Filas Offline",
@@ -4516,7 +4267,8 @@ namespace GelitaITToolkit.Forms
                     MessageBoxIcon.Warning) != DialogResult.Yes)
                 return;
 
-            var success = await _printerService.RepairOfflineQueuesAsync();
+            var success = await _printerService.RepairOfflineQueuesAsync(operation.Token);
+            if (!success) operation.MarkFailed();
             AddLog(success ? "Filas offline corrigidas e spooler reiniciado." : "Falha ao corrigir filas offline.",
                 success ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(success ? "Reparo concluído." : "O reparo não foi concluído. Verifique os logs.",
@@ -4536,7 +4288,7 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                var backupPath = new BackupService().CreateBackup(dialog.SelectedPath);
+                var backupPath = _backupService.CreateBackup(dialog.SelectedPath);
                 AddLog($"Backup criado: {backupPath}", LogLevel.Info);
                 MessageBox.Show($"Backup criado com sucesso:\n\n{backupPath}", "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -4547,12 +4299,17 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async void ToolsSecurityStatusButton_Click(object? sender, EventArgs e)
+        private async void ToolsSecurityStatusButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsSecurityStatusButton_ClickAsync(sender, e));
+
+        private async Task ToolsSecurityStatusButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("security-diagnostics", sender);
+            if (operation == null) return;
             UpdateStatusLabel("Verificando segurança do computador...");
             try
             {
-                var results = await new SystemSecurityService().GetStatusAsync();
+                var results = await _systemSecurityService.GetStatusAsync();
                 var summary = string.Join(Environment.NewLine, results.Select(result => result.ToString()));
                 AddLog($"Diagnóstico de segurança concluído: {results.Count(result => result.Success)}/{results.Count} itens conformes.", LogLevel.Info);
                 MessageBox.Show(summary, "Segurança do Computador", MessageBoxButtons.OK,
@@ -4560,6 +4317,7 @@ namespace GelitaITToolkit.Forms
             }
             catch (Exception ex)
             {
+                operation.MarkFailed();
                 AddLog($"Falha no diagnóstico de segurança: {ex.Message}", LogLevel.Error);
                 MessageBox.Show("Não foi possível concluir o diagnóstico.", "Segurança", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -4569,13 +4327,17 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async void ToolsCheckUpdateButton_Click(object? sender, EventArgs e)
+        private async void ToolsCheckUpdateButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsCheckUpdateButton_ClickAsync(sender, e));
+
+        private async Task ToolsCheckUpdateButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("toolkit-update", sender);
+            if (operation == null) return;
             try
             {
                 UpdateStatusLabel("Consultando versão disponível...");
-                var updateService = new UpdateService();
-                var update = await updateService.CheckAsync();
+                var update = await _updateService.CheckAsync(operation.Token);
                 var message =
                     $"Versão instalada: {update.InstalledVersion}\n" +
                     $"Versão disponível: {update.AvailableVersion?.ToString() ?? "não identificada"}\n" +
@@ -4606,12 +4368,12 @@ namespace GelitaITToolkit.Forms
                 var downloadDirectory = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
-                var downloaded = await updateService.DownloadAndValidateAsync(update, downloadDirectory);
+                var downloaded = await _updateService.DownloadAndValidateAsync(update, downloadDirectory, operation.Token);
                 AddLog($"Atualização baixada e validada por SHA-256: {downloaded}", LogLevel.Info);
                 UpdateStatusLabel("Preparando atualização automática...");
-                var preparedUpdate = await updateService.PrepareAutomaticUpdateAsync(
+                var preparedUpdate = await _updateService.PrepareAutomaticUpdateAsync(
                     downloaded,
-                    update.AvailableVersion!);
+                    update.AvailableVersion!, operation.Token);
 
                 if (MessageBox.Show(
                         "A atualização foi baixada, validada e está pronta.\n\n" +
@@ -4631,12 +4393,21 @@ namespace GelitaITToolkit.Forms
                     return;
                 }
 
-                updateService.LaunchPreparedUpdate(preparedUpdate);
+                _updateService.LaunchPreparedUpdate(preparedUpdate);
                 AddLog("Atualizador iniciado; encerrando o Toolkit para substituir os arquivos.", LogLevel.Info);
                 Application.Exit();
             }
+            catch (OperationCanceledException)
+            {
+                var timedOut = !operation.Token.IsCancellationRequested;
+                if (timedOut)
+                    operation.MarkTimedOut();
+                AddLog(timedOut ? "A verificação da atualização excedeu o tempo limite." : "Atualização cancelada pelo usuário.", LogLevel.Warning);
+                UpdateStatusLabel(timedOut ? "Tempo limite excedido." : "Atualização cancelada.");
+            }
             catch (Exception ex)
             {
+                operation.MarkFailed();
                 AddLog($"Falha ao verificar atualização: {ex.Message}", LogLevel.Error);
                 MessageBox.Show("Não foi possível verificar a atualização. Consulte os logs.", "Atualizações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -4650,7 +4421,7 @@ namespace GelitaITToolkit.Forms
         {
             try
             {
-                var update = await new UpdateService().CheckAsync();
+                var update = await _updateService.CheckAsync();
                 if (!update.UpdateAvailable)
                     return;
 
@@ -4669,18 +4440,13 @@ namespace GelitaITToolkit.Forms
 
         private void ToolsPrinterMgmtButton_Click(object? sender, EventArgs e)
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = "explorer.exe",
-                Arguments = "shell:::{A8A91A66-3A7D-4424-8D24-04E180695C7A}",
-                UseShellExecute = true
-            });
+            _repairService.OpenPrinterManagement();
             AddLog("Dispositivos e Impressoras aberto.", LogLevel.Info);
         }
 
         private void ToolsDeviceMgmtButton_Click(object? sender, EventArgs e)
         {
-            Process.Start(new ProcessStartInfo { FileName = "devmgmt.msc", UseShellExecute = true });
+            _repairService.OpenDeviceManager();
             AddLog("Gerenciador de Dispositivos aberto.", LogLevel.Info);
         }
 
@@ -4700,10 +4466,14 @@ namespace GelitaITToolkit.Forms
                 "Todos os trabalhos de impressão pendentes serão cancelados e o serviço de impressão será reiniciado.");
         }
 
-        private async void ToolsRestartSpoolerButton_Click(object? sender, EventArgs e)
+        private async void ToolsRestartSpoolerButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsRestartSpoolerButton_ClickAsync(sender, e));
+
+        private async Task ToolsRestartSpoolerButton_ClickAsync(object? sender, EventArgs e)
         {
-            var stopped = await RunProcessAsync("sc.exe", "stop spooler");
-            var started = stopped && await RunProcessAsync("sc.exe", "start spooler");
+            using var operation = BeginOperation("spooler-restart", sender);
+            if (operation == null) return;
+            var started = await _repairService.RestartSpoolerAsync(operation.Token);
             AddLog(started ? "Serviço de impressão reiniciado." : "Falha ao reiniciar o serviço de impressão.", started ? LogLevel.Info : LogLevel.Error);
             if (started)
             {
@@ -4728,14 +4498,7 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.System),
-                        "cleanmgr.exe"),
-                    Arguments = "/d C:",
-                    UseShellExecute = true
-                });
+                _repairService.OpenDiskCleanup();
                 AddLog("Limpeza de Disco aberta para a unidade C:.", LogLevel.Info);
                 UpdateStatusLabel("Limpeza de Disco aberta.");
             }
@@ -4877,13 +4640,7 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/k \"title {title} && {command}\"",
-                    Verb = "runas",
-                    UseShellExecute = true
-                });
+                _repairService.LaunchElevatedCommand(title, command);
                 AddLog($"{title} iniciado em uma janela administrativa.", LogLevel.Info);
                 UpdateStatusLabel($"{title} iniciado.");
             }
@@ -4912,21 +4669,7 @@ namespace GelitaITToolkit.Forms
 
             try
             {
-                var encodedCommand = Convert.ToBase64String(
-                    System.Text.Encoding.Unicode.GetBytes(script));
-                var powershellPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                    "System32",
-                    "WindowsPowerShell",
-                    "v1.0",
-                    "powershell.exe");
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = powershellPath,
-                    Arguments = $"-NoLogo -NoProfile -NoExit -EncodedCommand {encodedCommand}",
-                    Verb = "runas",
-                    UseShellExecute = true
-                });
+                _repairService.LaunchElevatedPowerShell(script);
                 AddLog($"{title} iniciado em uma janela administrativa.", LogLevel.Info);
                 UpdateStatusLabel($"{title} iniciado.");
             }
@@ -4941,7 +4684,10 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        private async void ToolsPortTesterButton_Click(object? sender, EventArgs e)
+        private async void ToolsPortTesterButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => ToolsPortTesterButton_ClickAsync(sender, e));
+
+        private async Task ToolsPortTesterButton_ClickAsync(object? sender, EventArgs e)
         {
             var host = PromptForText("Testador de Porta", "Informe o IP ou nome do computador/impressora:");
             if (string.IsNullOrWhiteSpace(host))
@@ -4996,12 +4742,18 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA CONFIGURAÇÕES ====
 
-        private async void SettingsReloadButton_Click(object? sender, EventArgs e)
+        private async void SettingsReloadButton_Click(object? sender, EventArgs e) =>
+            await ExecuteEventHandlerAsync(() => SettingsReloadButton_ClickAsync(sender, e));
+
+        private async Task SettingsReloadButton_ClickAsync(object? sender, EventArgs e)
         {
+            using var operation = BeginOperation("configuration-reload", sender);
+            if (operation == null) return;
             var statusTextBox = FindControl<RichTextBox>("SettingsStatusRichTextBox");
             var missingVariables = _configService.GetMissingEnvironmentVariables();
             if (missingVariables.Count > 0)
             {
+                operation.MarkValidationBlocked();
                 if (statusTextBox != null)
                 {
                     statusTextBox.ForeColor = Color.DarkOrange;
@@ -5016,6 +4768,7 @@ namespace GelitaITToolkit.Forms
             var errors = _configService.ValidateConfigurationFiles();
             if (errors.Count > 0)
             {
+                operation.MarkValidationBlocked();
                 if (statusTextBox != null)
                 {
                     statusTextBox.ForeColor = Color.Firebrick;

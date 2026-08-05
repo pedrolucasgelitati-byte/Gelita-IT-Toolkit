@@ -176,6 +176,46 @@ Quando um instalador for incluído ou substituído:
 
 Um hash ausente ou diferente bloqueia a execução. Não armazene tokens, senhas ou chaves nos arquivos JSON.
 
+Para reforçar a autenticidade das atualizações, defina
+`GELITA_TOOLKIT_SIGNER_THUMBPRINT` com o thumbprint do certificado Authenticode
+usado para assinar o executável publicado. Quando configurado, pacotes sem uma
+assinatura válida desse certificado são bloqueados mesmo que o SHA-256 confira.
+
+### Assinatura digital das releases
+
+Releases publicadas pelo workflow exigem um certificado Authenticode válido e
+os seguintes secrets no repositório:
+
+| Secret | Conteúdo |
+| --- | --- |
+| `WINDOWS_SIGNING_CERTIFICATE_BASE64` | Arquivo PFX convertido para Base64 |
+| `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` | Senha do PFX |
+| `WINDOWS_SIGNING_CERTIFICATE_THUMBPRINT` | Thumbprint público esperado |
+
+Se qualquer secret estiver ausente, se o PFX não corresponder ao thumbprint ou
+se a assinatura não for válida, a publicação é interrompida. O pacote recebe um
+arquivo `.env` contendo somente `GELITA_TOOLKIT_SIGNER_THUMBPRINT`; o thumbprint
+é público e não concede acesso à chave privada.
+
+Para gerar uma release local usando um certificado já instalado:
+
+```powershell
+.\Scripts\Publish-SignedRelease.ps1 `
+  -CertificateThumbprint 'THUMBPRINT_DO_CERTIFICADO'
+```
+
+Ou usando um PFX sem registrar sua senha no histórico do terminal:
+
+```powershell
+$password = Read-Host 'Senha do PFX' -AsSecureString
+.\Scripts\Publish-SignedRelease.ps1 `
+  -PfxPath 'C:\Certificados\Gelita-Code-Signing.pfx' `
+  -PfxPassword $password
+```
+
+Arquivos `.pfx` e `.p12` são ignorados pelo Git. Nunca armazene a chave privada,
+a senha ou o conteúdo Base64 em arquivos versionados.
+
 ## Atualização para Windows 11 25H2
 
 O Toolkit utiliza o pacote:
@@ -186,7 +226,78 @@ Assets/WindowsUpdates/windows11.0-kb5054156-x64.msu
 
 O equipamento deve ser x64, estar no Windows 11 24H2 e possuir uma build compatível com o pacote. Antes da execução, o programa valida elegibilidade, existência do arquivo e SHA-256. A atualização pode exigir reinicialização.
 
-## Compilação
+## Testes de integração em VM Windows
+
+A suíte `IntegrationTests` testa processos reais do Windows, inventário de
+hardware, porta TCP local, backup, diagnóstico de segurança e, opcionalmente,
+reinício do spooler. Ela é bloqueada por padrão e não deve ser habilitada em uma
+estação de trabalho.
+
+Fluxo recomendado:
+
+1. Prepare uma VM Windows 10/11 descartável com o .NET 8 SDK.
+2. Copie ou clone o projeto para a VM.
+3. Instale o Citrix, NAPS2, Epson Scan 2 e impressoras de teste quando esses
+   componentes fizerem parte da imagem controlada.
+4. Crie um checkpoint no hipervisor antes dos testes administrativos.
+5. Execute os testes seguros:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1
+   ```
+
+6. Para incluir diagnósticos que exigem elevação:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1 -IncludeAdministrative
+   ```
+
+7. Para testar o reinício real do spooler, abra o PowerShell como administrador
+   e informe o checkpoint criado:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1 `
+     -IncludeAdministrative `
+     -IncludeDestructive `
+     -CheckpointName 'Antes-Testes-Toolkit'
+   ```
+
+Depois dos testes destrutivos, restaure o checkpoint pelo hipervisor. O executor
+gera um arquivo TRX em `IntegrationTests/TestResults` para auditoria.
+
+## Integração contínua
+
+O workflow `.github/workflows/ci.yml` é executado em pushes e pull requests para
+`main` e também pode ser iniciado manualmente. Ele executa:
+
+- restauração com auditoria NuGet completa;
+- bloqueio quando a auditoria estiver indisponível ou encontrar vulnerabilidades;
+- build Release tratando avisos como erros;
+- 19 testes automatizados;
+- descoberta e compilação dos testes de integração para VM;
+- publicação portátil, autossuficiente e single-file para Windows x64;
+- validação dos arquivos obrigatórios e dos JSONs;
+- geração de ZIP e arquivo SHA-256;
+- upload dos resultados TRX e do pacote por 14 dias.
+
+O artefato recebe o sufixo `unsigned-ci` e serve apenas para homologação. A
+distribuição oficial deve usar o workflow de release, que exige assinatura
+Authenticode válida.
+
+## Telemetria local
+
+O Toolkit mantém métricas agregadas em
+`%LocalAppData%\GelitaITToolkit\telemetry.json`. Para cada operação são
+armazenados somente quantidade de tentativas, sucessos, falhas, cancelamentos e
+tempo total de execução em milissegundos.
+
+Não são armazenados nome do usuário, computador, domínio, IP, MAC, caminhos,
+argumentos de processos, nomes de impressoras ou conteúdo dos logs. Os
+identificadores aceitam apenas nomes técnicos predefinidos, como
+`printer-install` e `security-diagnostics`. O arquivo permanece somente no
+computador local e pode ser excluído para zerar os indicadores.
+
+## Compilação local
 
 Restaure as dependências e compile em modo Release:
 

@@ -8,12 +8,13 @@ namespace GelitaITToolkit.Services
     using System.Text;
     using System.Text.Json;
     using System.Text.Json.Nodes;
+    using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
     /// Fornece funcionalidades para gerenciar e configurar scanners Epson.
     /// </summary>
-    public class ScannerService
+    public class ScannerService : IScannerService
     {
         /// <summary>
         /// Inicializa uma nova instância da classe <see cref="ScannerService"/>.
@@ -27,12 +28,13 @@ namespace GelitaITToolkit.Services
         /// A lista não é armazenada junto do Toolkit para evitar que configurações
         /// específicas de uma máquina sejam transportadas em pendrives.
         /// </summary>
-        public List<Scanner> GetConfiguredEpsonScanners()
+        public List<Scanner> GetConfiguredEpsonScanners(CancellationToken cancellationToken = default)
         {
             const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(connectionFile))
                     return new List<Scanner>();
 
@@ -61,6 +63,10 @@ namespace GelitaITToolkit.Services
                     .OrderBy(scanner => scanner.Name, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch
             {
                 return new List<Scanner>();
@@ -72,12 +78,16 @@ namespace GelitaITToolkit.Services
         /// O Epson grava este rótulo como "Rede 01"; o Toolkit o substitui pelo
         /// nome da fila da impressora que possui o scanner.
         /// </summary>
-        public bool TryConfigureEpsonScanner(Scanner scanner, out string message)
+        public bool TryConfigureEpsonScanner(
+            Scanner scanner,
+            out string message,
+            CancellationToken cancellationToken = default)
         {
             const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Directory.CreateDirectory(Path.GetDirectoryName(connectionFile)!);
                 var contents = File.Exists(connectionFile)
                     ? File.ReadAllText(connectionFile, Encoding.Unicode)
@@ -148,7 +158,10 @@ namespace GelitaITToolkit.Services
                     File.Copy(connectionFile, connectionFile + ".toolkit.bak", overwrite: true);
                 File.WriteAllText(connectionFile, json, new UnicodeEncoding(false, true));
 
-                var updatedProfiles = TryUpdateEpsonPreferencesForAllUsers(root, out var preferenceErrors);
+                var updatedProfiles = TryUpdateEpsonPreferencesForAllUsers(
+                    root,
+                    out var preferenceErrors,
+                    cancellationToken);
                 message = $"O scanner {scanner.Name} foi configurado no Epson Scan 2 para {updatedProfiles} perfil(is) de usuário.";
                 if (preferenceErrors.Count > 0)
                     message += $" Não foi possível atualizar: {string.Join("; ", preferenceErrors)}.";
@@ -159,6 +172,10 @@ namespace GelitaITToolkit.Services
                 message = "São necessárias permissões de administrador para atualizar a configuração do Epson Scan 2.";
                 return false;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 message = $"Não foi possível atualizar o nome no Epson Scan 2: {ex.Message}";
@@ -168,7 +185,8 @@ namespace GelitaITToolkit.Services
 
         private static int TryUpdateEpsonPreferencesForAllUsers(
             JsonNode? connectionRoot,
-            out List<string> errors)
+            out List<string> errors,
+            CancellationToken cancellationToken)
         {
             errors = new List<string>();
             var configuredDevices = FindAllEpsonDeviceReferences(connectionRoot)
@@ -182,6 +200,7 @@ namespace GelitaITToolkit.Services
             var updated = 0;
             foreach (var profileDirectory in UserProfileService.GetLocalProfileDirectories())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var profileName = Path.GetFileName(profileDirectory.TrimEnd(Path.DirectorySeparatorChar));
                 try
                 {
@@ -205,6 +224,7 @@ namespace GelitaITToolkit.Services
 
                     foreach (var device in configuredDevices)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var scannerId = device["scannerID"]!["string"]!.GetValue<string>();
                         var guid = device["GUID"]!["string"]!.GetValue<string>();
                         preferences[scannerId] = new JsonObject { ["string"] = guid };
@@ -218,6 +238,10 @@ namespace GelitaITToolkit.Services
                         new UnicodeEncoding(false, true));
                     updated++;
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     errors.Add($"{profileName}: {ex.Message}");
@@ -228,12 +252,16 @@ namespace GelitaITToolkit.Services
         }
 
         /// <summary>Remove do Epson Scan 2 a conexão de rede correspondente ao IP informado.</summary>
-        public bool TryRemoveEpsonScanner(string ipAddress, out string message)
+        public bool TryRemoveEpsonScanner(
+            string ipAddress,
+            out string message,
+            CancellationToken cancellationToken = default)
         {
             const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(connectionFile))
                 {
                     message = "Nenhuma configuração do Epson Scan 2 foi encontrada neste computador.";
@@ -261,6 +289,10 @@ namespace GelitaITToolkit.Services
                 message = "São necessárias permissões de administrador para remover a configuração do Epson Scan 2.";
                 return false;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 message = $"Não foi possível remover o scanner do Epson Scan 2: {ex.Message}";
@@ -268,11 +300,14 @@ namespace GelitaITToolkit.Services
             }
         }
 
-        public bool TryRemoveDuplicateEpsonScanners(out string message)
+        public bool TryRemoveDuplicateEpsonScanners(
+            out string message,
+            CancellationToken cancellationToken = default)
         {
             const string connectionFile = @"C:\ProgramData\EPSON\Epson Scan 2\Connection\ConnectInfo.dat";
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(connectionFile))
                 {
                     message = "Nenhuma configuração do Epson Scan 2 foi encontrada.";
@@ -295,8 +330,11 @@ namespace GelitaITToolkit.Services
                 }
 
                 foreach (var duplicate in duplicates)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (duplicate.Parent is JsonArray parent)
                         parent.Remove(duplicate);
+                }
 
                 if ((root as JsonObject)?["DeviceList"] is JsonArray deviceList)
                     NormalizeEpsonDeviceList(deviceList);
@@ -314,6 +352,10 @@ namespace GelitaITToolkit.Services
                 message = "São necessárias permissões de administrador para limpar as duplicidades do Epson Scan 2.";
                 return false;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 message = $"Não foi possível limpar as duplicidades do Epson Scan 2: {ex.Message}";
@@ -321,7 +363,7 @@ namespace GelitaITToolkit.Services
             }
         }
 
-        private static JsonObject? CreateEpsonDeviceDefinition(string model)
+        internal static JsonObject? CreateEpsonDeviceDefinition(string model)
         {
             if (IsEpsonColorScannerModel(model))
             {
@@ -489,53 +531,5 @@ namespace GelitaITToolkit.Services
             return null;
         }
 
-        /// <summary>
-        /// Obtém a lista de scanners disponíveis.
-        /// </summary>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo uma lista de scanners.</returns>
-        public Task<List<Scanner>> GetAvailableScanners()
-        {
-            throw new System.NotImplementedException();
-        }
-
-        /// <summary>
-        /// Configura um scanner Epson no sistema.
-        /// </summary>
-        /// <param name="scanner">O scanner a ser configurado.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação de configuração.</returns>
-        public Task<bool> ConfigureScanner(Scanner scanner)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        /// <summary>
-        /// Configura múltiplos scanners no sistema.
-        /// </summary>
-        /// <param name="scanners">A lista de scanners a serem configurados.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo o resultado da configuração.</returns>
-        public Task<bool> ConfigureMultipleScanners(List<Scanner> scanners)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        /// <summary>
-        /// Remove a configuração de um scanner do sistema.
-        /// </summary>
-        /// <param name="scannerId">O identificador do scanner a ser removido.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação de remoção.</returns>
-        public Task<bool> RemoveScanner(string scannerId)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        /// <summary>
-        /// Verifica se um scanner está configurado no sistema.
-        /// </summary>
-        /// <param name="scannerId">O identificador do scanner a verificar.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo um valor booleano indicando se o scanner está configurado.</returns>
-        public Task<bool> IsScannerConfigured(string scannerId)
-        {
-            throw new System.NotImplementedException();
-        }
     }
 }

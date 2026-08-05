@@ -1,71 +1,148 @@
 namespace GelitaITToolkit.Services
 {
+    using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Runtime.InteropServices;
+    using System.Threading;
     using System.Threading.Tasks;
+    using GelitaITToolkit.Models;
 
-    /// <summary>
-    /// Fornece funcionalidades para executar e gerenciar processos do Windows.
-    /// </summary>
-    public class ProcessService
+    /// <summary>Executa processos de forma observável, cancelável e com timeout.</summary>
+    public sealed class ProcessService
     {
-        /// <summary>
-        /// Inicializa uma nova instância da classe <see cref="ProcessService"/>.
-        /// </summary>
-        public ProcessService()
+        public Task<ProcessExecutionResult> RunAsync(
+            string fileName,
+            string arguments,
+            string? workingDirectory = null,
+            TimeSpan? timeout = null,
+            CancellationToken cancellationToken = default) =>
+            RunAsync(fileName, SplitArguments(arguments), workingDirectory, timeout, cancellationToken);
+
+        public async Task<ProcessExecutionResult> RunAsync(
+            string fileName,
+            IEnumerable<string>? arguments = null,
+            string? workingDirectory = null,
+            TimeSpan? timeout = null,
+            CancellationToken cancellationToken = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = workingDirectory ?? string.Empty,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            foreach (var argument in arguments ?? Array.Empty<string>())
+                startInfo.ArgumentList.Add(argument);
+
+            using var process = new Process { StartInfo = startInfo };
+            try
+            {
+                if (!process.Start())
+                    return new ProcessExecutionResult { Exception = new InvalidOperationException("O processo não foi iniciado.") };
+
+                var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+                var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+                using var timeoutSource = timeout.HasValue
+                    ? new CancellationTokenSource(timeout.Value)
+                    : new CancellationTokenSource();
+                using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    timeoutSource.Token);
+
+                try
+                {
+                    await process.WaitForExitAsync(linkedSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    TryKill(process);
+                    await process.WaitForExitAsync(CancellationToken.None);
+                    return new ProcessExecutionResult
+                    {
+                        StandardOutput = await outputTask,
+                        StandardError = await errorTask,
+                        TimedOut = timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested,
+                        WasCancelled = cancellationToken.IsCancellationRequested
+                    };
+                }
+
+                return new ProcessExecutionResult
+                {
+                    ExitCode = process.ExitCode,
+                    StandardOutput = await outputTask,
+                    StandardError = await errorTask
+                };
+            }
+            catch (Exception ex)
+            {
+                TryKill(process);
+                return new ProcessExecutionResult { Exception = ex };
+            }
         }
 
-        /// <summary>
-        /// Executa um arquivo ou comando e aguarda a conclusão.
-        /// </summary>
-        /// <param name="fileName">O nome do arquivo ou comando a ser executado.</param>
-        /// <param name="arguments">Os argumentos a serem passados ao processo.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo o código de saída do processo.</returns>
-        public Task<int> ExecuteProcessAsync(string fileName, string arguments = "")
+        public Process? StartElevated(string fileName, IEnumerable<string>? arguments = null, string? workingDirectory = null)
         {
-            throw new System.NotImplementedException();
+            ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = workingDirectory ?? string.Empty,
+                Verb = "runas",
+                UseShellExecute = true
+            };
+            foreach (var argument in arguments ?? Array.Empty<string>())
+                startInfo.ArgumentList.Add(argument);
+            return Process.Start(startInfo);
         }
 
-        /// <summary>
-        /// Executa um arquivo ou comando com privilégios elevados (administrador).
-        /// </summary>
-        /// <param name="fileName">O nome do arquivo ou comando a ser executado.</param>
-        /// <param name="arguments">Os argumentos a serem passados ao processo.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo o código de saída do processo.</returns>
-        public Task<int> ExecuteProcessAsAdminAsync(string fileName, string arguments = "")
+        private static void TryKill(Process process)
         {
-            throw new System.NotImplementedException();
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException) { }
+            catch (System.ComponentModel.Win32Exception) { }
         }
 
-        /// <summary>
-        /// Obtém a saída padrão de um processo.
-        /// </summary>
-        /// <param name="fileName">O nome do arquivo ou comando a ser executado.</param>
-        /// <param name="arguments">Os argumentos a serem passados ao processo.</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação, contendo a saída do processo.</returns>
-        public Task<string> GetProcessOutput(string fileName, string arguments = "")
+        internal static IReadOnlyList<string> SplitArguments(string commandLine)
         {
-            throw new System.NotImplementedException();
+            if (string.IsNullOrWhiteSpace(commandLine))
+                return Array.Empty<string>();
+
+            var pointer = CommandLineToArgvW(commandLine, out var argumentCount);
+            if (pointer == IntPtr.Zero)
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+            try
+            {
+                var arguments = new string[argumentCount];
+                for (var index = 0; index < argumentCount; index++)
+                {
+                    var argumentPointer = Marshal.ReadIntPtr(pointer, index * IntPtr.Size);
+                    arguments[index] = Marshal.PtrToStringUni(argumentPointer) ?? string.Empty;
+                }
+                return arguments;
+            }
+            finally
+            {
+                LocalFree(pointer);
+            }
         }
 
-        /// <summary>
-        /// Verifica se um processo está em execução.
-        /// </summary>
-        /// <param name="processName">O nome do processo a verificar (sem extensão .exe).</param>
-        /// <returns>Um valor booleano indicando se o processo está em execução.</returns>
-        public bool IsProcessRunning(string processName)
-        {
-            throw new System.NotImplementedException();
-        }
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern IntPtr CommandLineToArgvW(
+            [MarshalAs(UnmanagedType.LPWStr)] string commandLine,
+            out int argumentCount);
 
-        /// <summary>
-        /// Encerra um processo pelo nome.
-        /// </summary>
-        /// <param name="processName">O nome do processo a encerrar (sem extensão .exe).</param>
-        /// <returns>Uma tarefa assíncrona que representa a operação de encerramento.</returns>
-        public Task<bool> KillProcess(string processName)
-        {
-            throw new System.NotImplementedException();
-        }
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr LocalFree(IntPtr memory);
     }
 }
