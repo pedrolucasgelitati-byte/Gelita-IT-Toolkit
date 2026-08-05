@@ -12,7 +12,7 @@ namespace GelitaITToolkit.Services
     using GelitaITToolkit.Models;
 
     /// <summary>Instala e remove conexões de impressoras compartilhadas em servidores de impressão.</summary>
-    public class PrinterService
+    public class PrinterService : IPrinterService
     {
         public Task<List<Printer>> GetPrintersByUnit(Unit unit)
         {
@@ -31,43 +31,45 @@ namespace GelitaITToolkit.Services
             return Task.FromResult(printers);
         }
 
-        public async Task<bool> InstallPrinter(Printer printer)
+        public async Task<bool> InstallPrinter(Printer printer, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(printer);
-            return await ExecutePrintUiAsync("/in", BuildPrinterPath(printer.Server, printer.Share));
+            return await ExecutePrintUiAsync("/in", BuildPrinterPath(printer.Server, printer.Share), cancellationToken);
         }
 
-        public async Task<bool> InstallMultiplePrinters(List<Printer> printers)
+        public async Task<bool> InstallMultiplePrinters(List<Printer> printers, CancellationToken cancellationToken = default)
         {
             foreach (var printer in printers)
             {
-                if (!await InstallPrinter(printer))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!await InstallPrinter(printer, cancellationToken))
                     return false;
             }
             return true;
         }
 
         /// <summary>Instala diretamente os compartilhamentos definidos para a unidade.</summary>
-        public async Task<bool> InstallAllForUnit(Unit unit)
+        public async Task<bool> InstallAllForUnit(Unit unit, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(unit);
-            return await InstallMultiplePrinters(await GetPrintersByUnit(unit));
+            return await InstallMultiplePrinters(await GetPrintersByUnit(unit), cancellationToken);
         }
 
-        public async Task<bool> RemovePrinter(string printerName, Unit unit)
+        public async Task<bool> RemovePrinter(string printerName, Unit unit, CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(printerName);
             ArgumentNullException.ThrowIfNull(unit);
-            return await ExecutePrintUiAsync("/dn", BuildPrinterPath(unit.PrintServer, printerName));
+            return await ExecutePrintUiAsync("/dn", BuildPrinterPath(unit.PrintServer, printerName), cancellationToken);
         }
 
         /// <summary>Remove diretamente todos os compartilhamentos definidos para a unidade.</summary>
-        public async Task<bool> RemoveAllForUnit(Unit unit)
+        public async Task<bool> RemoveAllForUnit(Unit unit, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(unit);
             foreach (var printerName in unit.Printers)
             {
-                if (!await RemovePrinter(printerName, unit))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!await RemovePrinter(printerName, unit, cancellationToken))
                     return false;
             }
             return true;
@@ -94,29 +96,40 @@ namespace GelitaITToolkit.Services
                 name.StartsWith($"{printerName} em ", StringComparison.OrdinalIgnoreCase));
         }
 
-        public async Task<bool> SetDefaultPrinter(Printer printer)
+        public async Task<bool> SetDefaultPrinter(Printer printer, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(printer);
             var installedName = FindInstalledPrinterName(printer);
-            return installedName != null && await ExecutePrintUiAsync("/y", installedName);
+            return installedName != null && await ExecutePrintUiAsync("/y", installedName, cancellationToken);
         }
 
-        public async Task<bool> PrintTestPage(Printer printer)
+        public async Task<bool> PrintTestPage(Printer printer, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(printer);
             var installedName = FindInstalledPrinterName(printer);
-            return installedName != null && await ExecutePrintUiAsync("/k", installedName);
+            return installedName != null && await ExecutePrintUiAsync("/k", installedName, cancellationToken);
         }
 
-        public async Task<bool> TestRawPrintPortAsync(string host, int timeoutMilliseconds = 3000)
+        public async Task<bool> TestRawPrintPortAsync(
+            string host,
+            int port = 9100,
+            int timeoutMilliseconds = 3000,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(host);
+            ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
             using var client = new TcpClient();
             using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMilliseconds));
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, cancellationToken);
             try
             {
-                await client.ConnectAsync(host, 9100, timeout.Token);
+                await client.ConnectAsync(host, port, linkedCancellation.Token);
                 return client.Connected;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch
             {
@@ -126,7 +139,8 @@ namespace GelitaITToolkit.Services
 
         public async Task<(bool Http, bool Https, string? Url)> TestDeviceWebPageAsync(
             string host,
-            int timeoutMilliseconds = 4000)
+            int timeoutMilliseconds = 4000,
+            CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(host);
             using var handler = new HttpClientHandler
@@ -141,11 +155,19 @@ namespace GelitaITToolkit.Services
 
             foreach (var scheme in new[] { "https", "http" })
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    using var response = await client.GetAsync($"{scheme}://{host}/", HttpCompletionOption.ResponseHeadersRead);
+                    using var response = await client.GetAsync(
+                        $"{scheme}://{host}/",
+                        HttpCompletionOption.ResponseHeadersRead,
+                        cancellationToken);
                     if ((int)response.StatusCode < 500)
                         return (scheme == "http", scheme == "https", $"{scheme}://{host}/");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch
                 {
@@ -156,7 +178,7 @@ namespace GelitaITToolkit.Services
             return (false, false, null);
         }
 
-        public async Task<bool> RepairOfflineQueuesAsync()
+        public async Task<bool> RepairOfflineQueuesAsync(CancellationToken cancellationToken = default)
         {
             const string script =
                 "$ErrorActionPreference='Stop'; " +
@@ -175,7 +197,16 @@ namespace GelitaITToolkit.Services
             });
             if (process == null)
                 return false;
-            await process.WaitForExitAsync();
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+                throw;
+            }
             return process.ExitCode == 0;
         }
 
@@ -188,16 +219,18 @@ namespace GelitaITToolkit.Services
                 .ToList();
         }
 
-        public async Task<int> RemoveDuplicateInstalledPrinters()
+        public async Task<int> RemoveDuplicateInstalledPrinters(CancellationToken cancellationToken = default)
         {
             var removed = 0;
             foreach (var group in FindDuplicateInstalledPrinters())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var defaultPrinter = group.FirstOrDefault(name => new PrinterSettings { PrinterName = name }.IsDefaultPrinter);
                 var keep = defaultPrinter ?? group[0];
                 foreach (var printerName in group.Where(name => !string.Equals(name, keep, StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (await ExecutePrintUiAsync("/dn", printerName))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (await ExecutePrintUiAsync("/dn", printerName, cancellationToken))
                         removed++;
                 }
             }
@@ -205,7 +238,10 @@ namespace GelitaITToolkit.Services
             return removed;
         }
 
-        private static async Task<bool> ExecutePrintUiAsync(string action, string printerPath)
+        private static async Task<bool> ExecutePrintUiAsync(
+            string action,
+            string printerPath,
+            CancellationToken cancellationToken)
         {
             using var process = Process.Start(new ProcessStartInfo
             {
@@ -218,7 +254,16 @@ namespace GelitaITToolkit.Services
             if (process == null)
                 return false;
 
-            await process.WaitForExitAsync();
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+                throw;
+            }
             return process.ExitCode == 0;
         }
 

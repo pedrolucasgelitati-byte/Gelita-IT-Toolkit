@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  CONFIGURATION: Release
+  DOTNET_SDK_VERSION: 8.0.423
+
+jobs:
+  validate-and-package:
+    name: Build, testes, auditoria e pacote portátil
+    runs-on: windows-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v6
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSION }}
+
+      - name: Restaurar com auditoria NuGet
+        shell: pwsh
+        run: |
+          dotnet restore .\Gelita-IT-Toolkit.sln `
+            -p:NuGetAudit=true `
+            -p:NuGetAuditMode=all `
+            -warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904
+
+      - name: Auditar dependências diretas e transitivas
+        shell: pwsh
+        run: |
+          $jsonText = dotnet list .\Gelita-IT-Toolkit.csproj package `
+            --vulnerable --include-transitive --format json --output-version 1
+          if ($LASTEXITCODE -ne 0) { throw 'A consulta de vulnerabilidades do NuGet falhou.' }
+          $audit = $jsonText | ConvertFrom-Json
+          $vulnerable = @(
+            foreach ($project in $audit.projects) {
+              foreach ($framework in $project.frameworks) {
+                @($framework.topLevelPackages) + @($framework.transitivePackages) |
+                  Where-Object { @($_.vulnerabilities).Count -gt 0 }
+              }
+            }
+          )
+          if ($vulnerable.Count -gt 0) {
+            $vulnerable | ForEach-Object { Write-Error "Pacote vulnerável: $($_.id) $($_.resolvedVersion)" }
+            throw 'A auditoria encontrou dependências vulneráveis.'
+          }
+          Write-Host 'Auditoria NuGet concluída sem vulnerabilidades conhecidas.'
+
+      - name: Compilar solução
+        shell: pwsh
+        run: dotnet build .\Gelita-IT-Toolkit.sln -c $env:CONFIGURATION --no-restore --warnaserror
+
+      - name: Executar testes unitários
+        shell: pwsh
+        run: |
+          dotnet test .\Tests\Gelita-IT-Toolkit.SmokeTests.csproj `
+            -c $env:CONFIGURATION --no-build --no-restore `
+            --logger 'trx;LogFileName=unit-tests.trx'
+
+      - name: Validar descoberta dos testes de integração
+        shell: pwsh
+        run: |
+          dotnet test .\IntegrationTests\Gelita-IT-Toolkit.IntegrationTests.csproj `
+            -c $env:CONFIGURATION --no-build --no-restore --list-tests
+
+      - name: Ler versão
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content .\Gelita-IT-Toolkit.csproj
+          $version = $project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Versão não encontrada.' }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar versão portátil Windows x64
+        shell: pwsh
+        run: |
+          dotnet publish .\Gelita-IT-Toolkit.csproj `
+            -c $env:CONFIGURATION -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=None -p:DebugSymbols=false `
+            -p:NuGetAudit=true -p:NuGetAuditMode=all `
+            -warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904 `
+            -o .\artifacts\portable
+
+      - name: Validar e empacotar artefato
+        id: package
+        shell: pwsh
+        run: |
+          $required = @(
+            '.\artifacts\portable\Gelita-IT-Toolkit.exe',
+            '.\artifacts\portable\Config\printers.json',
+            '.\artifacts\portable\Config\toolkit-settings.json',
+            '.\artifacts\portable\Assets',
+            '.\artifacts\portable\LEIA-ME.txt'
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Conteúdo obrigatório ausente: $path" }
+          }
+          Get-ChildItem .\artifacts\portable\Config\*.json | ForEach-Object {
+            Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json | Out-Null
+          }
+          if (Test-Path .\artifacts\portable\.env) { throw 'O CI não pode empacotar configuração local.' }
+          $name = 'Gelita-IT-Toolkit-v${{ steps.version.outputs.value }}-win-x64-unsigned-ci'
+          $zip = Join-Path $PWD "artifacts\$name.zip"
+          Compress-Archive -Path .\artifacts\portable\* -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash
+          "$hash  $name.zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+          "name=$name" >> $env:GITHUB_OUTPUT
+
+      - name: Publicar pacote portátil de CI
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            artifacts/${{ steps.package.outputs.name }}.zip
+            artifacts/${{ steps.package.outputs.name }}.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publicar resultados dos testes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ github.run_id }}
+          path: Tests/TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14

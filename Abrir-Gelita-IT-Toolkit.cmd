@@ -8,18 +8,6 @@ if exist "%~dp0Gelita-IT-Toolkit.exe" (
     exit /b 0
 )
 
-rem Repositorio de desenvolvimento: reutiliza um pacote publicado, se existir.
-set "portableExe="
-for %%F in ("%~dp0dist\Gelita-IT-Toolkit-v*-win-x64\Gelita-IT-Toolkit.exe") do (
-    if exist "%%~fF" (
-        set "portableExe=%%~fF"
-    )
-)
-if defined portableExe (
-    start "" "%portableExe%"
-    exit /b 0
-)
-
 rem Somente desenvolvedores precisam compilar o codigo-fonte.
 where dotnet >nul 2>&1
 if errorlevel 1 (

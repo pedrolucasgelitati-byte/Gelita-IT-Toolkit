@@ -4,6 +4,7 @@ namespace GelitaITToolkit.Services
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Threading;
     using System.Xml.Linq;
     using GelitaITToolkit.Models;
 
@@ -12,8 +13,12 @@ namespace GelitaITToolkit.Services
     {
         private static readonly XNamespace Xsi = "http://www.w3.org/2001/XMLSchema-instance";
 
-        public bool TryAddOrUpdateEpsonProfile(Scanner scanner, out string message)
+        public bool TryAddOrUpdateEpsonProfile(
+            Scanner scanner,
+            out string message,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var deviceName = GetTwainDeviceName(scanner.Model);
             if (deviceName == null)
             {
@@ -25,9 +30,10 @@ namespace GelitaITToolkit.Services
             var errors = new List<string>();
             foreach (var profileDirectory in UserProfileService.GetLocalProfileDirectories())
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var profileName = Path.GetFileName(profileDirectory.TrimEnd(Path.DirectorySeparatorChar));
                 var profilesDirectory = Path.Combine(profileDirectory, "AppData", "Roaming", "NAPS2");
-                if (TryAddOrUpdateEpsonProfileAtPath(scanner, deviceName, profilesDirectory, out var error))
+                if (TryAddOrUpdateEpsonProfileAtPath(scanner, deviceName, profilesDirectory, out var error, cancellationToken))
                     updatedProfiles.Add(profileName);
                 else
                     errors.Add($"{profileName}: {error}");
@@ -43,7 +49,8 @@ namespace GelitaITToolkit.Services
             Scanner scanner,
             string deviceName,
             string profilesDirectory,
-            out string message)
+            out string message,
+            CancellationToken cancellationToken)
         {
             var profilesPath = Path.Combine(profilesDirectory, "profiles.xml");
             var temporaryPath = profilesPath + ".toolkit.tmp";
@@ -52,6 +59,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Directory.CreateDirectory(profilesDirectory);
                 var document = File.Exists(profilesPath)
                     ? XDocument.Load(profilesPath)
@@ -100,6 +108,10 @@ namespace GelitaITToolkit.Services
                 message = $"Perfil “{displayName}” adicionado ao NAPS2.";
                 return true;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 message = $"Não foi possível atualizar os perfis do NAPS2: {ex.Message}";
@@ -112,7 +124,10 @@ namespace GelitaITToolkit.Services
             }
         }
 
-        public bool TryRemoveEpsonProfiles(IEnumerable<Scanner> scanners, out string message)
+        public bool TryRemoveEpsonProfiles(
+            IEnumerable<Scanner> scanners,
+            out string message,
+            CancellationToken cancellationToken = default)
         {
             var profilesDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -123,6 +138,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(profilesPath))
                 {
                     message = "Nenhum arquivo de perfis do NAPS2 foi encontrado para este usuário.";
@@ -151,7 +167,10 @@ namespace GelitaITToolkit.Services
                 }
 
                 foreach (var profile in profilesToRemove)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     profile.Remove();
+                }
 
                 var remainingProfiles = root.Elements("ScanProfile").ToList();
                 if (remainingProfiles.Count > 0 &&
@@ -168,6 +187,10 @@ namespace GelitaITToolkit.Services
                 message = $"{profilesToRemove.Count} perfil(is) removido(s) do NAPS2.";
                 return true;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 message = $"Não foi possível remover os perfis do NAPS2: {ex.Message}";
@@ -180,7 +203,9 @@ namespace GelitaITToolkit.Services
             }
         }
 
-        public bool TryRemoveDuplicateProfiles(out string message)
+        public bool TryRemoveDuplicateProfiles(
+            out string message,
+            CancellationToken cancellationToken = default)
         {
             var profilesDirectory = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -191,6 +216,7 @@ namespace GelitaITToolkit.Services
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!File.Exists(profilesPath))
                 {
                     message = "Nenhum arquivo de perfis do NAPS2 foi encontrado.";
@@ -220,13 +246,20 @@ namespace GelitaITToolkit.Services
                 }
 
                 foreach (var duplicate in duplicates)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     duplicate.Remove();
+                }
 
                 document.Save(temporaryPath);
                 File.Copy(profilesPath, backupPath, overwrite: true);
                 File.Move(temporaryPath, profilesPath, overwrite: true);
                 message = $"{duplicates.Count} perfil(is) duplicado(s) removido(s) do NAPS2.";
                 return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

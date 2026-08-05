@@ -2,7 +2,9 @@
 
 Ferramenta interna e portátil do Service Desk da Gelita para preparar, configurar, diagnosticar e reparar computadores Windows.
 
-**Versão atual:** 1.0.4
+**Versão publicada:** consulte a seção
+[Releases](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest);
+o número é mantido automaticamente no projeto e na tag Git.
 **Plataforma:** Windows x64
 **Tecnologia:** .NET 8 e Windows Forms
 
@@ -110,8 +112,8 @@ O erro **“dotnet não é reconhecido”** significa que o SDK não está insta
 installerprinters/
 ├── Assets/                         Instaladores, ícone e pacotes auxiliares
 ├── Config/                         Configurações JSON
-├── Core/                           Modelos e serviços centrais
 ├── Forms/                          Interface Windows Forms
+├── Models/                         Contratos de dados
 ├── Services/                       Instalação, diagnóstico e integrações
 ├── Program.cs                      Ponto de entrada
 ├── Gelita-IT-Toolkit.csproj        Configuração do projeto
@@ -126,8 +128,6 @@ Os instaladores grandes ou confidenciais podem estar ignorados pelo Git. Eles pr
 
 | Arquivo | Finalidade |
 | --- | --- |
-| `Config/appsettings.json` | Configuração geral da aplicação e logs |
-| `Config/units.json` | Unidades disponíveis |
 | `Config/printers.json` | Impressoras e scanners de cada unidade |
 | `Config/toolkit-settings.json` | Caminhos dos programas, pacotes e recursos |
 | `Config/installer-hashes.json` | Hashes SHA-256 permitidos para instaladores |
@@ -176,6 +176,46 @@ Quando um instalador for incluído ou substituído:
 
 Um hash ausente ou diferente bloqueia a execução. Não armazene tokens, senhas ou chaves nos arquivos JSON.
 
+Para reforçar a autenticidade das atualizações, defina
+`GELITA_TOOLKIT_SIGNER_THUMBPRINT` com o thumbprint do certificado Authenticode
+usado para assinar o executável publicado. Quando configurado, pacotes sem uma
+assinatura válida desse certificado são bloqueados mesmo que o SHA-256 confira.
+
+### Assinatura digital das releases
+
+Releases publicadas pelo workflow exigem um certificado Authenticode válido e
+os seguintes secrets no repositório:
+
+| Secret | Conteúdo |
+| --- | --- |
+| `WINDOWS_SIGNING_CERTIFICATE_BASE64` | Arquivo PFX convertido para Base64 |
+| `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` | Senha do PFX |
+| `WINDOWS_SIGNING_CERTIFICATE_THUMBPRINT` | Thumbprint público esperado |
+
+Se qualquer secret estiver ausente, se o PFX não corresponder ao thumbprint ou
+se a assinatura não for válida, a publicação é interrompida. O pacote recebe um
+arquivo `.env` contendo somente `GELITA_TOOLKIT_SIGNER_THUMBPRINT`; o thumbprint
+é público e não concede acesso à chave privada.
+
+Para gerar uma release local usando um certificado já instalado:
+
+```powershell
+.\Scripts\Publish-SignedRelease.ps1 `
+  -CertificateThumbprint 'THUMBPRINT_DO_CERTIFICADO'
+```
+
+Ou usando um PFX sem registrar sua senha no histórico do terminal:
+
+```powershell
+$password = Read-Host 'Senha do PFX' -AsSecureString
+.\Scripts\Publish-SignedRelease.ps1 `
+  -PfxPath 'C:\Certificados\Gelita-Code-Signing.pfx' `
+  -PfxPassword $password
+```
+
+Arquivos `.pfx` e `.p12` são ignorados pelo Git. Nunca armazene a chave privada,
+a senha ou o conteúdo Base64 em arquivos versionados.
+
 ## Atualização para Windows 11 25H2
 
 O Toolkit utiliza o pacote:
@@ -186,7 +226,78 @@ Assets/WindowsUpdates/windows11.0-kb5054156-x64.msu
 
 O equipamento deve ser x64, estar no Windows 11 24H2 e possuir uma build compatível com o pacote. Antes da execução, o programa valida elegibilidade, existência do arquivo e SHA-256. A atualização pode exigir reinicialização.
 
-## Compilação
+## Testes de integração em VM Windows
+
+A suíte `IntegrationTests` testa processos reais do Windows, inventário de
+hardware, porta TCP local, backup, diagnóstico de segurança e, opcionalmente,
+reinício do spooler. Ela é bloqueada por padrão e não deve ser habilitada em uma
+estação de trabalho.
+
+Fluxo recomendado:
+
+1. Prepare uma VM Windows 10/11 descartável com o .NET 8 SDK.
+2. Copie ou clone o projeto para a VM.
+3. Instale o Citrix, NAPS2, Epson Scan 2 e impressoras de teste quando esses
+   componentes fizerem parte da imagem controlada.
+4. Crie um checkpoint no hipervisor antes dos testes administrativos.
+5. Execute os testes seguros:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1
+   ```
+
+6. Para incluir diagnósticos que exigem elevação:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1 -IncludeAdministrative
+   ```
+
+7. Para testar o reinício real do spooler, abra o PowerShell como administrador
+   e informe o checkpoint criado:
+
+   ```powershell
+   .\Scripts\Run-IntegrationTests.ps1 `
+     -IncludeAdministrative `
+     -IncludeDestructive `
+     -CheckpointName 'Antes-Testes-Toolkit'
+   ```
+
+Depois dos testes destrutivos, restaure o checkpoint pelo hipervisor. O executor
+gera um arquivo TRX em `IntegrationTests/TestResults` para auditoria.
+
+## Integração contínua
+
+O workflow `.github/workflows/ci.yml` é executado em pushes e pull requests para
+`main` e também pode ser iniciado manualmente. Ele executa:
+
+- restauração com auditoria NuGet completa;
+- bloqueio quando a auditoria estiver indisponível ou encontrar vulnerabilidades;
+- build Release tratando avisos como erros;
+- 19 testes automatizados;
+- descoberta e compilação dos testes de integração para VM;
+- publicação portátil, autossuficiente e single-file para Windows x64;
+- validação dos arquivos obrigatórios e dos JSONs;
+- geração de ZIP e arquivo SHA-256;
+- upload dos resultados TRX e do pacote por 14 dias.
+
+O artefato recebe o sufixo `unsigned-ci` e serve apenas para homologação. A
+distribuição oficial deve usar o workflow de release, que exige assinatura
+Authenticode válida.
+
+## Telemetria local
+
+O Toolkit mantém métricas agregadas em
+`%LocalAppData%\GelitaITToolkit\telemetry.json`. Para cada operação são
+armazenados somente quantidade de tentativas, sucessos, falhas, cancelamentos e
+tempo total de execução em milissegundos.
+
+Não são armazenados nome do usuário, computador, domínio, IP, MAC, caminhos,
+argumentos de processos, nomes de impressoras ou conteúdo dos logs. Os
+identificadores aceitam apenas nomes técnicos predefinidos, como
+`printer-install` e `security-diagnostics`. O arquivo permanece somente no
+computador local e pode ser excluído para zerar os indicadores.
+
+## Compilação local
 
 Restaure as dependências e compile em modo Release:
 
@@ -214,7 +325,7 @@ dotnet publish .\Gelita-IT-Toolkit.csproj `
   -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:DebugType=None `
   -p:DebugSymbols=false `
-  -o .\dist\Gelita-IT-Toolkit-v1.0.4-win-x64
+  -o .\dist\Gelita-IT-Toolkit-win-x64
 ```
 
 Antes de distribuir:
@@ -243,9 +354,10 @@ O arquivo `.env` local é copiado da instalação anterior para a nova. Ele não
 incluído no pacote publicado e não é enviado ao GitHub.
 
 Além do número da versão, o Toolkit compara o SHA-256 do pacote publicado com o
-pacote instalado. Assim, uma correção publicada na mesma versão também é
-oferecida como atualização. O workflow `publish-current-version.yml` recompila e
-substitui os arquivos da release atual a cada push na branch `main`.
+pacote instalado. O workflow `publish-current-version.yml` é iniciado manualmente
+na aba Actions, permite escolher incremento `patch`, `minor` ou `major` e cria uma
+release imutável para a nova versão. Antes da publicação ele confirma que projeto,
+metadados do executável, manifesto do ZIP e tag possuem exatamente a mesma versão.
 
 A consulta por atualizações também ocorre silenciosamente ao iniciar, sem impedir
 o uso do programa quando a rede ou o GitHub estiverem indisponíveis. A assinatura
@@ -296,11 +408,19 @@ Além da compilação, faça testes em uma máquina sem configurações anterior
 
 ## Controle de versão
 
-- Atualize `Version`, `AssemblyVersion` e `FileVersion` no projeto.
-- Registre alterações relevantes no changelog da versão.
-- Faça o commit somente dos arquivos revisados.
-- Publique uma tag no formato `vX.Y.Z`.
-- Anexe o ZIP e seu checksum ao Release.
+- Abra **Actions → Criar release versionada → Run workflow**.
+- Escolha o incremento SemVer: `patch`, `minor` ou `major`.
+- Informe quantas releases estáveis devem ser mantidas, entre 1 e 50.
+- O workflow calcula a versão, atualiza `Version`, `AssemblyVersion` e
+  `FileVersion`, gera a entrada do `CHANGELOG.md` e as release notes.
+- Somente depois de build, testes, assinatura e validação, ele envia o commit,
+  cria a tag anotada `vX.Y.Z` e publica ZIP e SHA-256.
+- Releases estáveis além da retenção são removidas junto com suas tags. Drafts e
+  pré-releases não entram nessa limpeza.
+
+Os scripts `Scripts/Set-ReleaseVersion.ps1` e
+`Scripts/Test-ReleaseVersion.ps1` também podem ser usados para validar o fluxo
+localmente. Nunca crie manualmente uma tag de release antes da assinatura passar.
 
 ## Documentos antigos
 
