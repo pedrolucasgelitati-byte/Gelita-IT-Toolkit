@@ -9,7 +9,9 @@
     <!-- Informações da Aplicação -->
     <AssemblyName>Gelita-IT-Toolkit</AssemblyName>
     <RootNamespace>GelitaITToolkit</RootNamespace>
-    <Version>0.1.0-alpha</Version>
+    <Version>1.0.5</Version>
+    <FileVersion>1.0.5.0</FileVersion>
+    <AssemblyVersion>1.0.5.0</AssemblyVersion>
     <Authors>Gelita AG - Service Desk</Authors>
     <Description>Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.</Description>
     <Product>Gelita IT Toolkit</Product>
@@ -21,9 +23,21 @@
     <LangVersion>latest</LangVersion>
     <Configurations>Debug;Release</Configurations>
     <ApplicationIcon Condition="Exists('Assets\Icons\Gelita-IT-Toolkit.ico')">Assets\Icons\Gelita-IT-Toolkit.ico</ApplicationIcon>
+    <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <TreatWarningsAsErrors Condition="'$(CI)' == 'true'">true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <!-- Dependências do Projeto -->
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs;IntegrationTests\**\*.cs" />
+    <EmbeddedResource Remove="Tests\**\*;IntegrationTests\**\*" />
+    <None Remove="Tests\**\*;IntegrationTests\**\*" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Logging -->
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />

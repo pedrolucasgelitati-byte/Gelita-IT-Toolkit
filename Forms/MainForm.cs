@@ -1971,6 +1971,9 @@ namespace GelitaITToolkit.Forms
             Process? process = null;
             try
             {
+                if (!IsAllowedExecutable(fileName))
+                    return false;
+
                 process = Process.Start(new ProcessStartInfo
                 {
                     FileName = fileName,
@@ -1996,6 +1999,30 @@ namespace GelitaITToolkit.Forms
             {
                 process?.Dispose();
             }
+        }
+
+        private static bool IsAllowedExecutable(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return false;
+
+            if (!Path.IsPathRooted(fileName))
+            {
+                return fileName.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase) ||
+                       fileName.Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase) ||
+                       fileName.Equals("sc.exe", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var allowedRoots = new[]
+            {
+                AppDomain.CurrentDomain.BaseDirectory,
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                @"C:\ODT"
+            }.Where(path => !string.IsNullOrWhiteSpace(path));
+
+            return allowedRoots.Any(root => SecurityHelper.IsPathInsideDirectory(fileName, root));
         }
 
         private static void AddDashboardReadOnlyField(GroupBox parent, string labelText, string value, string controlName, int x, int y, int valueWidth)

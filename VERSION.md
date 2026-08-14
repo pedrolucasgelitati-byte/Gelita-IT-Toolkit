@@ -1,7 +1,7 @@
 # Versão
 
 Versão atual:
-0.1.0-alpha
+1.0.5
 
 Status:
-Em desenvolvimento
+Release

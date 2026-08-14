@@ -12,14 +12,27 @@ namespace GelitaITToolkit.Helpers
     {
         public static bool HasExpectedSha256(string filePath, string expectedHash)
         {
-            if (!File.Exists(filePath) || string.IsNullOrWhiteSpace(expectedHash))
+            if (!File.Exists(filePath) || expectedHash?.Length != 64)
                 return false;
 
-            using var stream = File.OpenRead(filePath);
-            var actualHash = Convert.ToHexString(SHA256.HashData(stream));
-            return CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(actualHash),
-                Convert.FromHexString(expectedHash));
+            try
+            {
+                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var actualHash = SHA256.HashData(stream);
+                var expectedHashBytes = Convert.FromHexString(expectedHash);
+                return CryptographicOperations.FixedTimeEquals(actualHash, expectedHashBytes);
+            }
+            catch (Exception) when (expectedHash.Length == 64)
+            {
+                return false;
+            }
+        }
+
+        public static bool IsPathInsideDirectory(string filePath, string trustedDirectory)
+        {
+            var fullPath = Path.GetFullPath(filePath);
+            var fullDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(trustedDirectory)) + Path.DirectorySeparatorChar;
+            return fullPath.StartsWith(fullDirectory, StringComparison.OrdinalIgnoreCase);
         }
 
         public static async Task<bool> HasValidMicrosoftSignatureAsync(string filePath)
