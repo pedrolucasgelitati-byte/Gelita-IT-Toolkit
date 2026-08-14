@@ -1,35 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
-    
     <!-- Informações da Aplicação -->
     <AssemblyName>Gelita-IT-Toolkit</AssemblyName>
     <RootNamespace>GelitaITToolkit</RootNamespace>
-    <Version>1.0.4</Version>
-    <AssemblyVersion>1.0.4.0</AssemblyVersion>
-    <FileVersion>1.0.4.0</FileVersion>
+    <Version>1.0.5</Version>
+    <AssemblyVersion>1.0.5.0</AssemblyVersion>
+    <FileVersion>1.0.5.0</FileVersion>
     <Authors>Gelita AG - Service Desk</Authors>
     <Description>Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.</Description>
     <Product>Gelita IT Toolkit</Product>
     <Company>Gelita AG</Company>
     <Title>Gelita IT Toolkit</Title>
-    
     <!-- Configurações de Build -->
     <StartupObject>GelitaITToolkit.Program</StartupObject>
     <LangVersion>latest</LangVersion>
     <Configurations>Debug;Release</Configurations>
     <ApplicationIcon Condition="Exists('Assets\Icons\Gelita-IT-Toolkit.ico')">Assets\Icons\Gelita-IT-Toolkit.ico</ApplicationIcon>
+    <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
-
   <!-- Dependências do Projeto -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
   </ItemGroup>
-
   <!-- Recursos Embed -->
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
@@ -55,5 +54,4 @@
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </None>
   </ItemGroup>
-
 </Project>

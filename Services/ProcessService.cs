@@ -3,10 +3,13 @@ namespace GelitaITToolkit.Services
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using System.IO;
+    using System.Linq;
     using System.Runtime.InteropServices;
     using System.Threading;
     using System.Threading.Tasks;
     using GelitaITToolkit.Models;
+    using GelitaITToolkit.Helpers;
 
     /// <summary>Executa processos de forma observável, cancelável e com timeout.</summary>
     public sealed class ProcessService
@@ -27,6 +30,8 @@ namespace GelitaITToolkit.Services
             CancellationToken cancellationToken = default)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            if (!IsAllowedExecutable(fileName))
+                return new ProcessExecutionResult { Exception = new UnauthorizedAccessException("Executable path is not allowed by the Toolkit policy.") };
 
             var startInfo = new ProcessStartInfo
             {
@@ -89,6 +94,8 @@ namespace GelitaITToolkit.Services
         public Process? StartElevated(string fileName, IEnumerable<string>? arguments = null, string? workingDirectory = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            if (!IsAllowedExecutable(fileName))
+                throw new UnauthorizedAccessException("Executable path is not allowed by the Toolkit policy.");
             var startInfo = new ProcessStartInfo
             {
                 FileName = fileName,
@@ -99,6 +106,28 @@ namespace GelitaITToolkit.Services
             foreach (var argument in arguments ?? Array.Empty<string>())
                 startInfo.ArgumentList.Add(argument);
             return Process.Start(startInfo);
+        }
+
+        private static bool IsAllowedExecutable(string fileName)
+        {
+            if (!Path.IsPathRooted(fileName))
+            {
+                return fileName.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase) ||
+                       fileName.Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase) ||
+                       fileName.Equals("ping.exe", StringComparison.OrdinalIgnoreCase) ||
+                       fileName.Equals("sc.exe", StringComparison.OrdinalIgnoreCase);
+            }
+
+            var allowedRoots = new[]
+            {
+                AppDomain.CurrentDomain.BaseDirectory,
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                @"C:\ODT"
+            }.Where(path => !string.IsNullOrWhiteSpace(path));
+
+            return allowedRoots.Any(root => SecurityHelper.IsPathInsideDirectory(fileName, root));
         }
 
         private static void TryKill(Process process)

@@ -91,6 +91,11 @@ local.settings.json
 
 # Pacote local do SentinelOne: instalador e token não devem ir para o GitHub
 Assets/SentinelOne/
+*.pfx
+*.p12
+*.cer
+*.key
+signing-settings.local.ps1
 
 # Pacote local do GlobalProtect: o MSI excede o limite de tamanho do GitHub
 Assets/PaloAlto Client/*.msi
