@@ -43,6 +43,13 @@ namespace GelitaITToolkit.Helpers
         public static bool IsSha256(string? value) =>
             value is { Length: 64 } && value.All(Uri.IsHexDigit);
 
+        public static bool IsPathInsideDirectory(string filePath, string trustedDirectory)
+        {
+            var fullPath = Path.GetFullPath(filePath);
+            var fullDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(trustedDirectory)) + Path.DirectorySeparatorChar;
+            return fullPath.StartsWith(fullDirectory, StringComparison.OrdinalIgnoreCase);
+        }
+
         public static async Task<bool> HasValidMicrosoftSignatureAsync(string filePath)
         {
             if (!File.Exists(filePath))

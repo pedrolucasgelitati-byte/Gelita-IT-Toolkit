@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 1.0.5 - 2026-08-14
+
+- fix: preserve install permissions during updates
+- Complete toolkit quality audit
+- Automate versioned releases
+- Modularize toolkit and harden operations
 ## 1.0.4 — 2026-08-04
 
 - Corrige o suporte à configuração dos scanners Epson WF-C5890.
