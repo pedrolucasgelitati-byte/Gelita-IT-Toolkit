@@ -34,6 +34,11 @@ gerado aleatoriamente (recomendado: 32 bytes ou mais). Coloque o ZIP sem `.env` 
 `Portal__PackagePath`. O portal cria uma cópia em memória e inclui o `.env` somente
 para usuários autenticados no momento do download.
 
+O arquivo `.env.download.example` define todas as variáveis que devem existir no
+pacote baixado. Configure os valores corporativos por
+`Portal__EnvironmentVariables__NOME_DA_VARIAVEL`; o portal combina o modelo, o
+`.env` existente no ZIP e as configurações do servidor, nessa ordem.
+
 O tenant configurado é a fronteira primária de segurança. O portal também rejeita
 logins cujo nome principal não termine em `gelita.com` ou
 `gelita-subcontractors.com`.
