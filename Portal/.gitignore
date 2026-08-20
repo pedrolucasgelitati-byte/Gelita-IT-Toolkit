@@ -1,0 +1,7 @@
+bin/
+obj/
+App_Data/
+packages/
+appsettings.Production.json
+*.user
+*.log

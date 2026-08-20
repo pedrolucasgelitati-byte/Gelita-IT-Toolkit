@@ -81,6 +81,9 @@ dist/
 publish/
 publish-signed/
 artifacts/
+Portal/App_Data/
+Portal/packages/
+App_Data/
 
 # Local environment variables
 .env

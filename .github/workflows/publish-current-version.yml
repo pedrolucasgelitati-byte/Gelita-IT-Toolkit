@@ -55,12 +55,18 @@ jobs:
         run: |
           [xml]$project = Get-Content .\Gelita-IT-Toolkit.csproj -Raw
           [version]$current = @($project.Project.PropertyGroup.Version | Where-Object { $_ })[0]
-          $next = switch ('${{ inputs.increment }}') {
-            'major' { [version]::new($current.Major + 1, 0, 0) }
-            'minor' { [version]::new($current.Major, $current.Minor + 1, 0) }
-            default { [version]::new($current.Major, $current.Minor, $current.Build + 1) }
+          $currentTag = "v$($current.ToString(3))"
+          if (-not (git tag --list $currentTag)) {
+            $version = $current.ToString(3)
           }
-          $version = $next.ToString(3)
+          else {
+            $next = switch ('${{ inputs.increment }}') {
+              'major' { [version]::new($current.Major + 1, 0, 0) }
+              'minor' { [version]::new($current.Major, $current.Minor + 1, 0) }
+              default { [version]::new($current.Major, $current.Minor, $current.Build + 1) }
+            }
+            $version = $next.ToString(3)
+          }
           $tag = "v$version"
           if (git tag --list $tag) { throw "A tag $tag já existe." }
           $previousTag = git describe --tags --abbrev=0 2>$null

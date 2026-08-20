@@ -1,0 +1,43 @@
+.inventory-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.unit-filter {
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--muted);
+}
+
+.unit-filter span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.unit-filter select {
+  min-width: 150px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .inventory-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .unit-filter,
+  .unit-filter select {
+    width: 100%;
+  }
+}
