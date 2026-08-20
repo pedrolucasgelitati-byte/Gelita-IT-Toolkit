@@ -126,16 +126,31 @@ jobs:
           }
 
       - name: Assinar executável
+        id: signing
         shell: pwsh
         env:
           CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
           EXPECTED_THUMBPRINT: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_THUMBPRINT }}
         run: |
-          foreach ($value in 'CERTIFICATE_BASE64','CERTIFICATE_PASSWORD','EXPECTED_THUMBPRINT') {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($value))) {
-              throw "Secret $value ausente."
-            }
+          $required = 'CERTIFICATE_BASE64','CERTIFICATE_PASSWORD','EXPECTED_THUMBPRINT'
+          $configured = @($required | Where-Object {
+            -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($configured.Count -eq 0) {
+            @(
+              'PACOTE NÃO ASSINADO DIGITALMENTE',
+              '',
+              'Esta versão foi publicada sem certificado de assinatura de código.',
+              'O Windows pode exibir um aviso ao executar o aplicativo.'
+            ) | Set-Content .\publish\SIGNING-STATUS.txt -Encoding utf8
+            Add-Content .\release-notes.md "`n> **Aviso:** esta versão foi publicada sem assinatura digital. O Windows pode exibir um alerta de segurança."
+            'signed=false' >> $env:GITHUB_OUTPUT
+            Write-Warning 'Certificado não configurado; publicando pacote não assinado.'
+            exit 0
+          }
+          if ($configured.Count -ne $required.Count) {
+            throw 'Configuração de assinatura incompleta. Configure todos os três secrets ou remova todos.'
           }
           $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
           try {
@@ -148,6 +163,7 @@ jobs:
               -TimestampServer 'http://timestamp.digicert.com' -HashAlgorithm SHA256
             if ($signature.Status -ne 'Valid') { throw "Assinatura inválida: $($signature.StatusMessage)" }
             "GELITA_TOOLKIT_SIGNER_THUMBPRINT=$expected" | Set-Content .\publish\.env -Encoding ascii
+            'signed=true' >> $env:GITHUB_OUTPUT
           }
           finally {
             if ($certificate) { Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue }
@@ -160,7 +176,8 @@ jobs:
         run: |
           $name = 'Gelita-IT-Toolkit-v${{ steps.version.outputs.version }}-win-x64'
           $zip = Join-Path $PWD "$name.zip"
-          $items = @('.\publish\*', '.\publish\.env')
+          $items = @('.\publish\*')
+          if (Test-Path -LiteralPath '.\publish\.env') { $items += '.\publish\.env' }
           Compress-Archive -Path $items -DestinationPath $zip -CompressionLevel Optimal
           .\Scripts\Test-ReleaseVersion.ps1 `
             -ExpectedVersion '${{ steps.version.outputs.version }}' `
