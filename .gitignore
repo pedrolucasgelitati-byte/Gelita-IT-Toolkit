@@ -90,6 +90,7 @@ App_Data/
 .env.local
 .env.*
 !.env.example
+!Portal/.env.download.example
 local.settings.json
 
 # Pacote local do SentinelOne: instalador e token não devem ir para o GitHub

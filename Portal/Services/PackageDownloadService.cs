@@ -21,6 +21,7 @@ public sealed class PackageDownloadService(IWebHostEnvironment environment, ICon
         using (var archive = new ZipArchive(output, ZipArchiveMode.Update, leaveOpen: true))
         {
             var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            await LoadTemplateAsync(variables, cancellationToken);
             var existingEnvironment = archive.GetEntry(".env");
             if (existingEnvironment != null)
             {
@@ -45,6 +46,19 @@ public sealed class PackageDownloadService(IWebHostEnvironment environment, ICon
 
         output.Position = 0;
         return (output, Path.GetFileName(packagePath));
+    }
+
+    private async Task LoadTemplateAsync(
+        IDictionary<string, string> variables,
+        CancellationToken cancellationToken)
+    {
+        var configuredPath = configuration["Portal:EnvironmentTemplatePath"] ?? ".env.download.example";
+        var templatePath = Path.GetFullPath(Path.Combine(environment.ContentRootPath, configuredPath));
+        if (!File.Exists(templatePath))
+            throw new FileNotFoundException("O modelo completo do arquivo .env não foi encontrado.", templatePath);
+
+        foreach (var line in await File.ReadAllLinesAsync(templatePath, cancellationToken))
+            TryAddExistingVariable(line, variables);
     }
 
     private static void ValidateName(string name)
