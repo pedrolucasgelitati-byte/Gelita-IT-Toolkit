@@ -8,9 +8,9 @@
     <!-- Informações da Aplicação -->
     <AssemblyName>Gelita-IT-Toolkit</AssemblyName>
     <RootNamespace>GelitaITToolkit</RootNamespace>
-    <Version>1.0.5</Version>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
-    <FileVersion>1.0.5.0</FileVersion>
+    <Version>1.0.6</Version>
+    <AssemblyVersion>1.0.6.0</AssemblyVersion>
+    <FileVersion>1.0.6.0</FileVersion>
     <Authors>Gelita AG - Service Desk</Authors>
     <Description>Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.</Description>
     <Product>Gelita IT Toolkit</Product>
@@ -33,6 +33,7 @@
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <Compile Remove="IntegrationTests\**\*.cs" />
+    <Compile Remove="Portal\**\*.cs" />
     <None Update="Config\*.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>

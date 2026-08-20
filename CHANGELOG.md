@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 1.0.6 - 2026-08-20
+
+- Adiciona o portal corporativo com autenticação Microsoft Entra ID.
+- Registra máquina, usuário, unidade, Windows, versão e status do SentinelOne.
+- Envia o inventário ao iniciar o Toolkit e atualiza o painel a cada cinco minutos.
+- Disponibiliza o pacote portátil autenticado com configuração do agente incluída no download.
+- Preserva configurações existentes do pacote ao gerar o `.env` para cada download.
+- Adiciona pesquisa, indicadores de versão, presença e alertas ao painel.
+
 ## 1.0.5 - 2026-08-14
 
 - fix: preserve install permissions during updates

@@ -40,6 +40,7 @@ namespace GelitaITToolkit
                 Application.SetCompatibleTextRenderingDefault(false);
                 
                 using var services = ConfigureServices();
+                services.GetRequiredService<PortalHeartbeatService>().Start();
                 Application.Run(services.GetRequiredService<MainForm>());
             }
             catch (Exception ex)
@@ -58,6 +59,7 @@ namespace GelitaITToolkit
             services.AddSingleton<ProcessService>();
             services.AddSingleton<OperationCoordinator>();
             services.AddSingleton<LocalTelemetryService>();
+            services.AddSingleton<PortalHeartbeatService>();
             services.AddSingleton<ConfigService>();
             services.AddSingleton<IPrinterService, PrinterService>();
             services.AddSingleton<IScannerService, ScannerService>();
