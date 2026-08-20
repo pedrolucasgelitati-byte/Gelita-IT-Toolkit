@@ -2,6 +2,15 @@
 
 ## 1.0.6 - 2026-08-20
 
+- Allow unsigned release when certificate is unavailable
+- Add management portal and machine heartbeat
+- Harden toolkit release 1.0.5
+- fix: preserve install permissions during updates
+- Complete toolkit quality audit
+- Automate versioned releases
+- Modularize toolkit and harden operations
+## 1.0.6 - 2026-08-20
+
 - Adiciona o portal corporativo com autenticação Microsoft Entra ID.
 - Registra máquina, usuário, unidade, Windows, versão e status do SentinelOne.
 - Envia o inventário ao iniciar o Toolkit e atualiza o painel a cada cinco minutos.
