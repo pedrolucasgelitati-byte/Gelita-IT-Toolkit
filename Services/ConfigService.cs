@@ -72,13 +72,6 @@
                 if (!File.Exists(filePath))
                 {
                     CreateDefaultPrintersJson(filePath);
-                    MessageBox.Show(
-                        "Arquivo printers.json foi criado automaticamente.\n\n" +
-                        "Localização: " + filePath + "\n\n" +
-                        "Por favor, edite este arquivo com suas unidades e impressoras.",
-                        "Arquivo de Configuração Criado",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
                 }
 
                 // Lê arquivo JSON
@@ -242,12 +235,6 @@
                 if (!File.Exists(filePath))
                 {
                     CreateDefaultScannersJson(filePath);
-                    MessageBox.Show(
-                        "Arquivo scanners.json foi criado automaticamente.\n\n" +
-                        "Localização: " + filePath,
-                        "Arquivo de Configuração Criado",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
                 }
 
                 // Lê arquivo JSON
@@ -383,36 +370,7 @@
         {
             try
             {
-                string defaultJson = @"{
-  ""units"": [
-    {
-      ""name"": ""Maringá"",
-      ""printServer"": ""\\\\br-mga1-srv013v"",
-      ""printers"": [
-        ""MG_PRINTER_224"",
-        ""MG_PRINTER_225"",
-        ""MG_PRINTER_226""
-      ]
-    },
-    {
-      ""name"": ""Mococa"",
-      ""printServer"": ""\\\\br-mco1-srv001v"",
-      ""printers"": [
-        ""MC_PRINTER_001"",
-        ""MC_PRINTER_002""
-      ]
-    },
-    {
-      ""name"": ""Cotia"",
-      ""printServer"": ""\\\\br-cot1-srv001v"",
-      ""printers"": [
-        ""CT_PRINTER_001"",
-        ""CT_PRINTER_002"",
-        ""CT_PRINTER_003""
-      ]
-    }
-  ]
-}";
+                string defaultJson = "{\"units\": []}";
 
                 File.WriteAllText(filePath, defaultJson);
             }
@@ -433,28 +391,7 @@
         {
             try
             {
-                string defaultJson = @"{
-  ""scanners"": [
-    {
-      ""model"": ""Epson WF-C5899"",
-      ""displayName"": ""Epson WorkForce Pro WF-C5899"",
-      ""ipAddress"": ""192.168.1.100"",
-      ""scannerId"": ""SERIAL001"",
-      ""productId"": ""0x08B8"",
-      ""guid"": ""{12345678-1234-1234-1234-123456789012}"",
-      ""name"": ""SCANNER_C5899_001""
-    },
-    {
-      ""model"": ""Epson WF-M5899"",
-      ""displayName"": ""Epson WorkForce Pro WF-M5899"",
-      ""ipAddress"": ""192.168.1.101"",
-      ""scannerId"": ""SERIAL002"",
-      ""productId"": ""0x0906"",
-      ""guid"": ""{87654321-4321-4321-4321-210987654321}"",
-      ""name"": ""SCANNER_M5899_001""
-    }
-  ]
-}";
+                string defaultJson = "{\"scanners\": []}";
 
                 File.WriteAllText(filePath, defaultJson);
             }
@@ -475,28 +412,7 @@
         {
             try
             {
-                string defaultJson = @"{
-  ""units"": [
-    {
-      ""name"": ""Maringá"",
-      ""location"": ""Paraná"",
-      ""contact"": ""Service Desk Maringá"",
-      ""printers"": []
-    },
-    {
-      ""name"": ""Mococa"",
-      ""location"": ""São Paulo"",
-      ""contact"": ""Service Desk Mococa"",
-      ""printers"": []
-    },
-    {
-      ""name"": ""Cotia"",
-      ""location"": ""São Paulo"",
-      ""contact"": ""Service Desk Cotia"",
-      ""printers"": []
-    }
-  ]
-}";
+                string defaultJson = "{\"units\": []}";
 
                 File.WriteAllText(filePath, defaultJson);
             }

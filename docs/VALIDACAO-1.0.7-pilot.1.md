@@ -5,7 +5,7 @@ Data: 4 de novembro de 2026.
 ## Executado
 
 - Compilação Windows .NET 8: sem erros; 92 avisos do projeto permanecem.
-- 30 verificações locais: integridade de payloads, limites de diretórios, autorização
+- 32 verificações locais: integridade de payloads, limites de diretórios, autorização
   Windows, elevação via UAC, persistência de configuração de scanner, URLs e aliases
   Citrix, comportamento da notificação e estrutura dos dois pacotes Epson.
 - Hashes SHA-256 dos dois pacotes Epson conferidos. Ambos contêm driver INF e um
@@ -18,6 +18,8 @@ Data: 4 de novembro de 2026.
   conhecida reportada pelas fontes consultadas nesta execução.
 - Arquivos de token, artefatos de validação, snapshots de checkout, instaladores
   e inventário local retirados do índice, com cópias locais preservadas.
+- Uma instalação sem templates também inicia com inventário vazio. Foram removidos
+  os inventários fictícios/corporativos embutidos e os avisos modais de inicialização vazia.
 
 Os testes com payloads Epson são opcionais em CI porque esses arquivos não são
 publicados no código-fonte. Os demais testes executam sem instalar drivers ou

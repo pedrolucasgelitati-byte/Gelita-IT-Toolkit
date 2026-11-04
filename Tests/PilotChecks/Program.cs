@@ -50,6 +50,9 @@ internal static class PilotChecks
         var scanner = new Scanner("Epson WF-M5899", "192.0.2.10", "Pilot", "test", "test", "Pilot", Guid.NewGuid().ToString());
         Check(config.SaveScanners(new[] { scanner }), "Scanner configuration saved");
         Check(new ConfigService(temporary).LoadScanners().Single().IpAddress == scanner.IpAddress, "Scanner configuration survives reload");
+        var withoutTemplates = new ConfigService(Path.Combine(temporary, "without-templates"));
+        Check(withoutTemplates.LoadUnits().Count == 0, "Missing templates create empty units without a dialog");
+        Check(withoutTemplates.LoadScanners().Count == 0, "Missing templates create empty scanners without a dialog");
 
         var main = typeof(MainForm);
         var match = main.GetMethod("CitrixUrlsMatch", HiddenStatic)!;
