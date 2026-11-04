@@ -1,4 +1,4 @@
-namespace GelitaITToolkit.Forms
+﻿namespace GelitaITToolkit.Forms
 {
     using System;
     using System.Collections.Generic;
@@ -37,10 +37,15 @@ namespace GelitaITToolkit.Forms
         {
             public string PrinterName { get; init; } = string.Empty;
             public string? ScannerModel { get; init; }
+            public string? IpAddress { get; init; }
 
-            public override string ToString() => string.IsNullOrWhiteSpace(ScannerModel)
-                ? $"{PrinterName} — modelo não informado"
-                : $"{PrinterName} — {ScannerModel}";
+            public override string ToString()
+            {
+                var description = string.IsNullOrWhiteSpace(ScannerModel)
+                    ? $"{PrinterName} — modelo não informado"
+                    : $"{PrinterName} — {ScannerModel}";
+                return $"{description} — IP: {(string.IsNullOrWhiteSpace(IpAddress) ? "não configurado" : IpAddress)}";
+            }
         }
 
         private sealed class CitrixStoreOption
@@ -108,13 +113,12 @@ namespace GelitaITToolkit.Forms
         /// RichTextBox para exibição de logs.
         /// </summary>
         private RichTextBox _logsRichTextBox;
-        private ComboBox _citrixStoresComboBox = null!;
+        private CheckedListBox _citrixStoresCheckedListBox = null!;
+        private bool _isConfiguringCitrix;
         private SplitContainer _navigationContainer = null!;
         private Panel _sideNavigation = null!;
         private Label _sideNavigationTitle = null!;
         private readonly List<Button> _sideNavigationButtons = new();
-        private readonly Timer _sideNavigationTimer = new() { Interval = 450 };
-        private bool _sideNavigationExpanded;
 
         private static readonly Color GelitaNavy = Color.FromArgb(0, 59, 112);
         private static readonly Color GelitaYellow = Color.FromArgb(245, 169, 0);
@@ -122,6 +126,7 @@ namespace GelitaITToolkit.Forms
         private const string EpsonM5899Sha256 = "EED5C191DA1AE422E63C9D2BA5979EED4A27EE3E23A14BB6D1C5C7DC5D0F544E";
         private const string NapsSha256 = "FD77DE4A6D123FE781C56DC06A710CF834F55C37D782BB6C2D4C7CB64B717E7A";
         private const string PaloAltoSha256 = "AB4CD5E6421759B47596F861550F48CA2DF4ADD12B0FFF34984ACFC72CB21EA0";
+        private const string ChromeSha256 = "ECF1B28BF4E8E8B3434A844EB915118935E6525768EFE3DBE622C2A20CBA9EC9";
         private const string SentinelMsiSha256 = "57834BA1213784B897480E9AA1A6F121CBE6D04FA034495F2D860A835AE98919";
         private const string SentinelScriptSha256 = "26B6B35F880A025F7213E709DA16DD11B56B925229E7303E6EB08A59577DC5E6";
         private static readonly Color GelitaLight = Color.FromArgb(247, 248, 250);
@@ -137,6 +142,8 @@ namespace GelitaITToolkit.Forms
         /// </summary>
         public MainForm()
         {
+            WindowsAccessService.DemandAdministrativeAccess();
+
             // Inicializar serviço de configuração
             _configService = new ConfigService();
             _printerService = new PrinterService();
@@ -160,6 +167,8 @@ namespace GelitaITToolkit.Forms
             // Criar componentes
             InitializeComponent();
             ApplyReadableFontScale(this);
+            InitializeThemeSwitcher();
+            InitializeSmoothResizing();
         }
 
         private static Icon LoadApplicationIcon()
@@ -225,26 +234,27 @@ namespace GelitaITToolkit.Forms
         }
 
         /// <summary>
-        /// Cria o menu principal com opções de arquivo e ajuda.
+        /// Cria o menu lateral fixo com acesso às abas da aplicação.
         /// </summary>
         private void CreateSideNavigation()
         {
             _sideNavigation = new Panel
             {
+                Name = "SideNavigationPanel",
                 Dock = DockStyle.Fill,
                 BackColor = GelitaNavy,
-                Padding = new Padding(6, 10, 6, 10)
+                Padding = new Padding(12, 14, 12, 14),
+                AutoScroll = true
             };
 
             _sideNavigationTitle = new Label
             {
-                Text = "☰",
-                Location = new Point(6, 12),
-                Size = new Size(36, 32),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                ForeColor = GelitaYellow,
-                Cursor = Cursors.Hand
+                Text = "GELITA IT TOOLKIT",
+                Location = new Point(12, 16),
+                Size = new Size(200, 34),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = GelitaYellow
             };
             _sideNavigation.Controls.Add(_sideNavigationTitle);
 
@@ -261,21 +271,22 @@ namespace GelitaITToolkit.Forms
                 ("Sobre", "Sobre")
             };
 
-            var top = 62;
+            var top = 72;
             foreach (var (title, tabText) in navigationItems)
             {
                 var button = new Button
                 {
                     Text = title,
                     Tag = tabText,
-                    Location = new Point(6, top),
-                    Size = new Size(204, 36),
+                    Name = "Navigation" + tabText,
+                    Location = new Point(12, top),
+                    Size = new Size(200, 40),
                     FlatStyle = FlatStyle.Flat,
                     BackColor = GelitaNavy,
                     ForeColor = Color.White,
                     TextAlign = ContentAlignment.MiddleLeft,
                     Padding = new Padding(12, 0, 0, 0),
-                    Visible = false,
+                    Visible = true,
                     Cursor = Cursors.Hand
                 };
                 button.FlatAppearance.BorderSize = 0;
@@ -283,15 +294,12 @@ namespace GelitaITToolkit.Forms
                 button.Click += SideNavigationButton_Click;
                 _sideNavigationButtons.Add(button);
                 _sideNavigation.Controls.Add(button);
-                top += 42;
+                top += 46;
             }
 
-            _sideNavigation.MouseEnter += SideNavigation_MouseEnter;
-            _sideNavigation.MouseLeave += SideNavigation_MouseLeave;
-            _sideNavigationTitle.MouseEnter += SideNavigation_MouseEnter;
-            _sideNavigationTimer.Tick += (_, _) => CollapseSideNavigation();
-
             _navigationContainer.Panel1.Controls.Add(_sideNavigation);
+            _tabControl.SelectedIndexChanged += (_, _) => UpdateSelectedNavigation();
+            UpdateSelectedNavigation();
         }
 
         private void SideNavigationButton_Click(object? sender, EventArgs e)
@@ -300,49 +308,26 @@ namespace GelitaITToolkit.Forms
             {
                 var tab = _tabControl.TabPages.Cast<TabPage>().FirstOrDefault(page => page.Text == tabText);
                 if (tab != null)
+                {
                     _tabControl.SelectedTab = tab;
+                    UpdateSelectedNavigation();
+                }
             }
         }
 
-        private void SideNavigation_MouseEnter(object? sender, EventArgs e)
+        private void UpdateSelectedNavigation()
         {
-            _sideNavigationTimer.Stop();
-            ExpandSideNavigation();
-        }
-
-        private void SideNavigation_MouseLeave(object? sender, EventArgs e)
-        {
-            _sideNavigationTimer.Stop();
-            _sideNavigationTimer.Start();
-        }
-
-        private void ExpandSideNavigation()
-        {
-            if (_sideNavigationExpanded)
-                return;
-
-            _sideNavigationExpanded = true;
-            _navigationContainer.SplitterDistance = 216;
-            _sideNavigationTitle.Text = "Gelita IT Tool Kit";
-            _sideNavigationTitle.Size = new Size(204, 32);
-            _sideNavigationTitle.TextAlign = ContentAlignment.MiddleLeft;
+            var selectedTab = _tabControl.SelectedTab ?? _tabControl.TabPages.Cast<TabPage>().FirstOrDefault();
             foreach (var button in _sideNavigationButtons)
-                button.Visible = true;
-        }
-
-        private void CollapseSideNavigation()
-        {
-            _sideNavigationTimer.Stop();
-            if (!_sideNavigationExpanded || _sideNavigation.ClientRectangle.Contains(_sideNavigation.PointToClient(Cursor.Position)))
-                return;
-
-            _sideNavigationExpanded = false;
-            foreach (var button in _sideNavigationButtons)
-                button.Visible = false;
-            _navigationContainer.SplitterDistance = 48;
-            _sideNavigationTitle.Text = "☰";
-            _sideNavigationTitle.Size = new Size(36, 32);
-            _sideNavigationTitle.TextAlign = ContentAlignment.MiddleCenter;
+            {
+                var selected = string.Equals(button.Tag as string, selectedTab?.Text, StringComparison.Ordinal);
+                button.BackColor = selected ? GelitaYellow : (_darkTheme ? Color.FromArgb(16, 31, 49) : GelitaNavy);
+                button.ForeColor = selected ? GelitaNavy : Color.White;
+                button.FlatAppearance.MouseOverBackColor = selected
+                    ? Color.FromArgb(255, 193, 42)
+                    : Color.FromArgb(0, 76, 145);
+                button.AccessibleDescription = selected ? "Aba selecionada" : "Abrir aba " + button.Text;
+            }
         }
 
         private void CreateMenuLayout()
@@ -376,11 +361,11 @@ namespace GelitaITToolkit.Forms
         }
 
         /// <summary>
-        /// Cria o TabControl com 8 abas: Dashboard, Impressoras, Scanners, Instalações, Ferramentas, Configurações, Logs e Sobre.
+        /// Cria as nove abas da aplicação e o painel de navegação lateral.
         /// </summary>
         private void CreateTabControl()
         {
-            _tabControl = new TabControl
+            _tabControl = new BorderlessTabs
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9),
@@ -404,7 +389,7 @@ namespace GelitaITToolkit.Forms
             _tabControl.TabPages.Add(CreateCitrixTab());
 
             // Aba 6: Ferramentas
-            _tabControl.TabPages.Add(CreateToolsTab());
+            _tabControl.TabPages.Add(CreateRestoredToolsTab());
 
             // Aba 6: Configurações
             _tabControl.TabPages.Add(CreateSettingsTab());
@@ -415,18 +400,18 @@ namespace GelitaITToolkit.Forms
             // Aba 8: Sobre
             _tabControl.TabPages.Add(CreateAboutTab());
 
-            ConfigureResponsiveLayout();
-            this.Shown += (_, _) => UseAvailableTabSpace();
             ApplyVisualStyle(_tabControl);
+            ModernizeWorkspace();
 
             _navigationContainer = new SplitContainer
             {
+                Size = ClientSize,
                 Dock = DockStyle.Fill,
                 FixedPanel = FixedPanel.Panel1,
                 IsSplitterFixed = true,
                 SplitterWidth = 1,
-                SplitterDistance = 48,
-                Panel1MinSize = 48,
+                SplitterDistance = 224,
+                Panel1MinSize = 224,
                 BackColor = GelitaBorder
             };
             _navigationContainer.Panel2.Controls.Add(_tabControl);
@@ -440,585 +425,10 @@ namespace GelitaITToolkit.Forms
         /// Cria a aba Dashboard com informações do computador.
         /// Mostra: Nome, Usuário, Domínio, IP, SO, Status.
         /// </summary>
-        private TabPage CreateDashboardTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Dashboard",
-                Name = "DashboardTab",
-                Padding = new Padding(10)
-            };
+        private TabPage CreateDashboardTab() => CreateDashboardWorkspace();
 
-            // Painel de Informações
-            var infoPanel = new GroupBox
-            {
-                Text = "Informações do Sistema",
-                Location = new Point(10, 10),
-                Size = new Size(950, 340),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
+        private TabPage CreateScannersTab() => CreateScannerWorkspace();
 
-            var hardware = GetHardwareInfo();
-            var operatingSystem = GetOperatingSystemInfo();
-
-            // Nome do Computador
-            var computerLabel = new Label
-            {
-                Text = "Computador:",
-                Location = new Point(20, 30),
-                Size = new Size(100, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(computerLabel);
-
-            var computerValue = new TextBox
-            {
-                Name = "ComputerNameTextBox",
-                Location = new Point(150, 30),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = Environment.MachineName
-            };
-            infoPanel.Controls.Add(computerValue);
-
-            // Usuário
-            var userLabel = new Label
-            {
-                Text = "Usuário:",
-                Location = new Point(20, 70),
-                Size = new Size(100, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(userLabel);
-
-            var userValue = new TextBox
-            {
-                Name = "UserNameTextBox",
-                Location = new Point(150, 70),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = Environment.UserName
-            };
-            infoPanel.Controls.Add(userValue);
-
-            // Domínio
-            var domainLabel = new Label
-            {
-                Text = "Domínio:",
-                Location = new Point(20, 110),
-                Size = new Size(100, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(domainLabel);
-
-            var domainValue = new TextBox
-            {
-                Name = "DomainTextBox",
-                Location = new Point(150, 110),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = Environment.UserDomainName
-            };
-            infoPanel.Controls.Add(domainValue);
-
-            // IP (placeholder)
-            var ipLabel = new Label
-            {
-                Text = "Endereço IP:",
-                Location = new Point(20, 150),
-                Size = new Size(100, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(ipLabel);
-
-            var ipValue = new TextBox
-            {
-                Name = "IPAddressTextBox",
-                Location = new Point(150, 150),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = GetPrimaryIpAddress()
-            };
-            infoPanel.Controls.Add(ipValue);
-
-            var macLabel = new Label
-            {
-                Text = "Endereço MAC:",
-                Location = new Point(20, 190),
-                Size = new Size(120, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(macLabel);
-
-            var macValue = new TextBox
-            {
-                Name = "MacAddressTextBox",
-                Location = new Point(150, 190),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = GetPrimaryMacAddress()
-            };
-            infoPanel.Controls.Add(macValue);
-
-            // Hardware
-            AddDashboardReadOnlyField(infoPanel, "Processador:", hardware.Processor, "ProcessorTextBox", 490, 30, 420);
-            AddDashboardReadOnlyField(infoPanel, "Memória RAM:", hardware.TotalMemory, "TotalMemoryTextBox", 490, 70, 420);
-            AddDashboardReadOnlyField(infoPanel, "Tipo da RAM:", hardware.MemoryType, "MemoryTypeTextBox", 490, 110, 420);
-            AddDashboardReadOnlyField(infoPanel, "Frequência RAM:", hardware.MemorySpeed, "MemorySpeedTextBox", 490, 150, 420);
-            AddDashboardReadOnlyField(infoPanel, "Service Tag Dell:", hardware.ServiceTag, "ServiceTagTextBox", 490, 190, 420);
-
-            // Sistema Operacional
-            var osLabel = new Label
-            {
-                Text = "Sistema Operacional:",
-                Location = new Point(20, 230),
-                Size = new Size(130, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(osLabel);
-
-            var osValue = new TextBox
-            {
-                Name = "OSTextBox",
-                Location = new Point(150, 230),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                Text = operatingSystem.Name
-            };
-            infoPanel.Controls.Add(osValue);
-
-            AddDashboardReadOnlyField(
-                infoPanel,
-                "Versão:",
-                operatingSystem.DisplayVersion,
-                "OSDisplayVersionTextBox",
-                20,
-                270,
-                300);
-
-            AddDashboardReadOnlyField(
-                infoPanel,
-                "Build completo:",
-                operatingSystem.FullBuild,
-                "OSBuildTextBox",
-                490,
-                230,
-                420);
-
-            // Status
-            var statusLabel = new Label
-            {
-                Text = "Status:",
-                Location = new Point(490, 270),
-                Size = new Size(125, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            infoPanel.Controls.Add(statusLabel);
-
-            var statusValue = new TextBox
-            {
-                Name = "DashboardStatusTextBox",
-                Location = new Point(615, 270),
-                Size = new Size(295, 25),
-                Font = new Font("Segoe UI", 9),
-                ReadOnly = true,
-                BackColor = Color.FromArgb(255, 247, 222),
-                ForeColor = GelitaNavy,
-                Text = "✓ Sistema Pronto"
-            };
-            infoPanel.Controls.Add(statusValue);
-
-            tabPage.Controls.Add(infoPanel);
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Impressoras com seleção de unidade, pesquisa, lista e botões.
-        /// Botões: Instalar, Instalar Todas, Remover, Atualizar.
-        /// </summary>
-        private TabPage CreatePrintersTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Impressoras",
-                Name = "PrintersTab",
-                Padding = new Padding(10)
-            };
-
-            // Painel de Seleção
-            var selectionPanel = new GroupBox
-            {
-                Text = "Seleção",
-                Location = new Point(10, 10),
-                Size = new Size(950, 80),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            // ComboBox Unidades
-            var unitLabel = new Label
-            {
-                Text = "Unidade:",
-                Location = new Point(20, 30),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            selectionPanel.Controls.Add(unitLabel);
-
-            var unitCombo = new ComboBox
-            {
-                Name = "PrintersUnitComboBox",
-                Location = new Point(100, 30),
-                Size = new Size(200, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9)
-            };
-            unitCombo.SelectedIndexChanged += PrintersUnitComboBox_SelectedIndexChanged;
-            selectionPanel.Controls.Add(unitCombo);
-
-            // TextBox Pesquisa
-            var searchLabel = new Label
-            {
-                Text = "Pesquisar:",
-                Location = new Point(320, 30),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            selectionPanel.Controls.Add(searchLabel);
-
-            var searchBox = new TextBox
-            {
-                Name = "PrintersSearchTextBox",
-                Location = new Point(400, 30),
-                Size = new Size(200, 25),
-                Font = new Font("Segoe UI", 9),
-                PlaceholderText = "Digite para pesquisar..."
-            };
-            selectionPanel.Controls.Add(searchBox);
-
-            // Botão Pesquisar
-            var searchButton = new Button
-            {
-                Name = "PrintersSearchButton",
-                Text = "Pesquisar",
-                Location = new Point(610, 30),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaYellow,
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat
-            };
-            searchButton.Click += PrintersSearchButton_Click;
-            selectionPanel.Controls.Add(searchButton);
-
-            tabPage.Controls.Add(selectionPanel);
-
-            // Painel de Lista
-            var listPanel = new GroupBox
-            {
-                Text = "Impressoras Disponíveis",
-                Location = new Point(10, 100),
-                Size = new Size(950, 350),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            var printersList = new CheckedListBox
-            {
-                Name = "PrintersCheckedListBox",
-                Location = new Point(20, 30),
-                Size = new Size(910, 300),
-                Font = new Font("Segoe UI", 9),
-                CheckOnClick = true
-            };
-            listPanel.Controls.Add(printersList);
-
-            tabPage.Controls.Add(listPanel);
-
-            // Painel de Botões
-            var buttonsPanel = new FlowLayoutPanel
-            {
-                Name = "PrintersActionsPanel",
-                Dock = DockStyle.Bottom,
-                Height = 52,
-                AutoSize = false,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(10, 8, 10, 8),
-                BackColor = Color.White
-            };
-
-            var installButton = new Button
-            {
-                Text = "Instalar Selecionadas",
-                Size = new Size(150, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            installButton.Click += PrintersInstallButton_Click;
-            buttonsPanel.Controls.Add(installButton);
-
-            var addPrinterButton = new Button
-            {
-                Text = "Adicionar Impressora",
-                Size = new Size(145, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaYellow,
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            addPrinterButton.Click += PrintersAddButton_Click;
-            buttonsPanel.Controls.Add(addPrinterButton);
-
-            var installAllButton = new Button
-            {
-                Text = "Instalar Todas",
-                Size = new Size(130, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            installAllButton.Click += PrintersInstallAllButton_Click;
-            buttonsPanel.Controls.Add(installAllButton);
-
-            var removeButton = new Button
-            {
-                Text = "Remover",
-                Size = new Size(100, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            removeButton.Click += PrintersRemoveButton_Click;
-            buttonsPanel.Controls.Add(removeButton);
-
-            var refreshButton = new Button
-            {
-                Text = "Atualizar",
-                Size = new Size(100, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            refreshButton.Click += PrintersRefreshButton_Click;
-            buttonsPanel.Controls.Add(refreshButton);
-
-            var pingButton = new Button
-            {
-                Text = "Testar Ping",
-                Size = new Size(110, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            pingButton.Click += PrintersPingButton_Click;
-            buttonsPanel.Controls.Add(pingButton);
-
-            tabPage.Controls.Add(buttonsPanel);
-            buttonsPanel.BringToFront();
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Scanners com lista dinâmica, IP, modelo e botões.
-        /// Botões: Adicionar, Remover, Testar Ping.
-        /// </summary>
-        private TabPage CreateScannersTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Scanners",
-                Name = "ScannersTab",
-                Padding = new Padding(10)
-            };
-
-            // Painel de Adição
-            var addPanel = new GroupBox
-            {
-                Text = "Adicionar Scanner",
-                Location = new Point(10, 10),
-                Size = new Size(950, 120),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            var unitLabel = new Label
-            {
-                Text = "Unidade:",
-                Location = new Point(20, 30),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            addPanel.Controls.Add(unitLabel);
-
-            var unitCombo = new ComboBox
-            {
-                Name = "ScannersUnitComboBox",
-                Location = new Point(100, 30),
-                Size = new Size(200, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9)
-            };
-            unitCombo.SelectedIndexChanged += ScannersUnitComboBox_SelectedIndexChanged;
-            addPanel.Controls.Add(unitCombo);
-
-            var printersList = new CheckedListBox
-            {
-                Name = "ScannersPrintersCheckedListBox",
-                Location = new Point(20, 30),
-                Size = new Size(910, 210),
-                Font = new Font("Segoe UI", 9),
-                CheckOnClick = true
-            };
-
-            var modelLabel = new Label
-            {
-                Text = "Modelo padrão:",
-                Location = new Point(320, 30),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            addPanel.Controls.Add(modelLabel);
-
-            var modelCombo = new ComboBox
-            {
-                Name = "ScannersModelComboBox",
-                Location = new Point(400, 30),
-                Size = new Size(200, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9)
-            };
-            modelCombo.Items.AddRange(new[] { "Epson WF-C5899", "Epson WF-M5899", "Outros" });
-            modelCombo.SelectedIndex = 0;
-            addPanel.Controls.Add(modelCombo);
-
-            var ipLabel = new Label
-            {
-                Text = "IP manual:",
-                Location = new Point(510, 70),
-                Size = new Size(80, 25),
-                Font = new Font("Segoe UI", 9)
-            };
-            addPanel.Controls.Add(ipLabel);
-
-            var ipBox = new TextBox
-            {
-                Name = "ScannersIPTextBox",
-                Location = new Point(590, 70),
-                Size = new Size(150, 25),
-                Font = new Font("Segoe UI", 9),
-                PlaceholderText = "Apenas uma seleção"
-            };
-            addPanel.Controls.Add(ipBox);
-
-            var addButton = new Button
-            {
-                Name = "ScannersAddButton",
-                Text = "+ Adicionar Selecionadas",
-                Location = new Point(750, 70),
-                Size = new Size(170, 25),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            addButton.Click += ScannersAddButton_Click;
-            addPanel.Controls.Add(addButton);
-
-            tabPage.Controls.Add(addPanel);
-
-            var scannerPrintersPanel = new GroupBox
-            {
-                Text = "Impressoras com scanner — selecione uma ou mais",
-                Location = new Point(10, 140),
-                Size = new Size(950, 260),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-            scannerPrintersPanel.Controls.Add(printersList);
-            tabPage.Controls.Add(scannerPrintersPanel);
-
-            // Painel de Lista
-            var listPanel = new GroupBox
-            {
-                Text = "Scanners Configurados",
-                Location = new Point(10, 410),
-                Size = new Size(950, 300),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            var scannersList = new ListBox
-            {
-                Name = "ScannersListBox",
-                Location = new Point(20, 30),
-                Size = new Size(910, 250),
-                Font = new Font("Segoe UI", 9),
-                SelectionMode = SelectionMode.One
-            };
-            listPanel.Controls.Add(scannersList);
-
-            tabPage.Controls.Add(listPanel);
-
-            // Painel de Botões
-            var buttonsPanel = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 52,
-                AutoSize = false,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(10, 8, 10, 8),
-                BackColor = Color.White
-            };
-
-            var removeButton = new Button
-            {
-                Text = "Remover Selecionado",
-                Size = new Size(150, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat
-            };
-            removeButton.Click += ScannersRemoveButton_Click;
-            buttonsPanel.Controls.Add(removeButton);
-
-            var pingButton = new Button
-            {
-                Text = "Testar Ping",
-                Size = new Size(120, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaYellow,
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            pingButton.Click += ScannersPingButton_Click;
-            buttonsPanel.Controls.Add(pingButton);
-
-            tabPage.Controls.Add(buttonsPanel);
-            buttonsPanel.BringToFront();
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Instalações com opções de software a instalar.
-        /// Checkboxes: Epson Scan 2, NAPS, Drivers.
-        /// Botão: Instalar.
-        /// </summary>
         private TabPage CreateInstallationsTab()
         {
             var tabPage = new TabPage
@@ -1029,20 +439,20 @@ namespace GelitaITToolkit.Forms
             };
 
             // Painel de Opções
-            var optionsPanel = new GroupBox
+            var optionsPanel = new WorkspaceCard
             {
                 Text = "Selecione os Softwares a Instalar",
                 Location = new Point(10, 10),
-                Size = new Size(950, 290),
+                Size = new Size(950, 390),
                 Font = new Font("Segoe UI", 10, FontStyle.Bold)
             };
 
             var epsonCheckbox = new CheckBox
             {
                 Name = "InstallEpsonScanCheckbox",
-                Text = "Driver do scanner Epson + Epson Scan 2",
+                Text = "Drivers Epson WF-C5899 + WF-M5899 e Epson Scan 2",
                 Location = new Point(30, 40),
-                Size = new Size(400, 25),
+                Size = new Size(600, 25),
                 Font = new Font("Segoe UI", 9),
                 Checked = false
             };
@@ -1092,10 +502,29 @@ namespace GelitaITToolkit.Forms
             };
             optionsPanel.Controls.Add(paloAltoCheckbox);
 
+            var chromeCheckbox = new CheckBox
+            {
+                Name = "InstallChromeCheckbox",
+                Text = "Google Chrome (64 bits)",
+                Location = new Point(30, 240),
+                Size = new Size(500, 25),
+                Font = new Font("Segoe UI", 9),
+                Checked = false
+            };
+            optionsPanel.Controls.Add(chromeCheckbox);
+
+            optionsPanel.Controls.Add(new CheckBox
+            {
+                Name = "InstallPawnIoCheckbox",
+                Text = "PawnIO — driver opcional para temperatura da CPU (instalador com confirmação)",
+                Location = new Point(30, 280), Size = new Size(850, 30),
+                Font = new Font("Segoe UI", 9), Checked = false
+            });
+
             var infoLabel = new Label
             {
-                Text = "ⓘ O pacote Epson instala o driver do scanner e o Epson Scan 2 juntos. Selecione o modelo correto antes de instalar.",
-                Location = new Point(30, 240),
+                Text = "ⓘ A opção Epson instala os pacotes dos dois modelos (WF-C5899 e WF-M5899) automaticamente, um após o outro.",
+                Location = new Point(30, 330),
                 Size = new Size(880, 40),
                 Font = new Font("Segoe UI", 8, FontStyle.Italic),
                 ForeColor = Color.Gray,
@@ -1108,7 +537,7 @@ namespace GelitaITToolkit.Forms
             // Painel de Botões
             var buttonsPanel = new FlowLayoutPanel
             {
-                Location = new Point(10, 310),
+                Location = new Point(10, 410),
                 Size = new Size(950, 50),
                 AutoSize = true,
                 FlowDirection = FlowDirection.LeftToRight
@@ -1135,415 +564,12 @@ namespace GelitaITToolkit.Forms
         /// Cria a aba Ferramentas com botões para utilitários.
         /// Botões: Gerenciador de Impressoras, Gerenciador de Dispositivos, Limpeza de Spool, etc.
         /// </summary>
-        private TabPage CreateCitrixTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Citrix",
-                Name = "CitrixTab",
-                Padding = new Padding(10)
-            };
+        private TabPage CreateCitrixTab() => CreateCitrixWorkspace();
 
-            var storeGroup = new GroupBox
-            {
-                Text = "Adicionar loja ao Citrix Workspace",
-                Location = new Point(10, 10),
-                Size = new Size(950, 300),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
+        private TabPage CreateSettingsTab() => CreateSettingsWorkspace();
 
-            storeGroup.Controls.Add(new Label
-            {
-                Text = "Selecione a loja que deve ser adicionada ao Citrix Workspace deste computador.",
-                Location = new Point(20, 35),
-                Size = new Size(780, 28),
-                Font = new Font("Segoe UI", 9)
-            });
+        private TabPage CreateLogsTab() => CreateLogsWorkspace();
 
-            storeGroup.Controls.Add(new Label
-            {
-                Text = "Loja:",
-                Location = new Point(20, 82),
-                Size = new Size(100, 28),
-                Font = new Font("Segoe UI", 9)
-            });
-
-            _citrixStoresComboBox = new ComboBox
-            {
-                Name = "CitrixStoresComboBox",
-                Location = new Point(125, 78),
-                Size = new Size(380, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 9)
-            };
-            _citrixStoresComboBox.Items.AddRange(new object[]
-            {
-                new CitrixStoreOption
-                {
-                    Name = "Gelita Europa",
-                    DiscoveryUrl = "https://citrixeb.eu.gelita.local"
-                },
-                new CitrixStoreOption
-                {
-                    Name = "Gelita Brasil - Interno",
-                    DiscoveryUrl = "https://sf.gelitausa.com/Citrix/CitrixBRInternal/discovery"
-                }
-            });
-            storeGroup.Controls.Add(_citrixStoresComboBox);
-
-            storeGroup.Controls.Add(new Label
-            {
-                Text = "EndereÃ§o:",
-                Location = new Point(20, 128),
-                Size = new Size(100, 28),
-                Font = new Font("Segoe UI", 9)
-            });
-
-            var storeUrlTextBox = new TextBox
-            {
-                Name = "CitrixStoreUrlTextBox",
-                Location = new Point(125, 124),
-                Size = new Size(700, 28),
-                ReadOnly = true,
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.White
-            };
-            storeGroup.Controls.Add(storeUrlTextBox);
-            _citrixStoresComboBox.SelectedIndexChanged += (_, _) =>
-                storeUrlTextBox.Text = (_citrixStoresComboBox.SelectedItem as CitrixStoreOption)?.DiscoveryUrl ?? string.Empty;
-            _citrixStoresComboBox.SelectedIndex = 0;
-
-            var addStoreButton = new Button
-            {
-                Text = "+ Adicionar Loja Selecionada",
-                Location = new Point(125, 185),
-                Size = new Size(230, 40),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-            addStoreButton.Click += CitrixAddStoreButton_Click;
-            storeGroup.Controls.Add(addStoreButton);
-
-            var openWorkspaceButton = new Button
-            {
-                Text = "Abrir Citrix Workspace",
-                Location = new Point(370, 185),
-                Size = new Size(200, 40),
-                BackColor = GelitaYellow,
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-            openWorkspaceButton.Click += CitrixOpenWorkspaceButton_Click;
-            storeGroup.Controls.Add(openWorkspaceButton);
-
-            storeGroup.Controls.Add(new Label
-            {
-                Text = "O Citrix Workspace deve estar instalado. A tela de login pode ser exibida pelo Citrix apÃ³s a inclusÃ£o da loja.",
-                Location = new Point(20, 245),
-                Size = new Size(850, 30),
-                Font = new Font("Segoe UI", 8, FontStyle.Italic),
-                ForeColor = Color.DimGray
-            });
-
-            tabPage.Controls.Add(storeGroup);
-            return tabPage;
-        }
-
-        private TabPage CreateToolsTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Ferramentas",
-                Name = "ToolsTab",
-                Padding = new Padding(10)
-            };
-
-            // Painel de Ferramentas
-            var toolsPanel = new GroupBox
-            {
-                Text = "Ferramentas Disponíveis",
-                Location = new Point(10, 10),
-                Size = new Size(950, 500),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            var flowPanel = new FlowLayoutPanel
-            {
-                Location = new Point(20, 30),
-                Size = new Size(910, 450),
-                FlowDirection = FlowDirection.TopDown,
-                AutoScroll = true,
-                Padding = new Padding(0)
-            };
-
-            // Botão Gerenciador de Impressoras
-            var printerMgmtButton = new Button
-            {
-                Text = "Abrir Gerenciador de Impressoras",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            printerMgmtButton.Click += ToolsPrinterMgmtButton_Click;
-            flowPanel.Controls.Add(printerMgmtButton);
-
-            // Botão Gerenciador de Dispositivos
-            var deviceMgmtButton = new Button
-            {
-                Text = "Abrir Gerenciador de Dispositivos",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            deviceMgmtButton.Click += ToolsDeviceMgmtButton_Click;
-            flowPanel.Controls.Add(deviceMgmtButton);
-
-            // Botão Limpeza de Spool
-            var spoolCleanButton = new Button
-            {
-                Text = "Limpar Spool de Impressão",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            spoolCleanButton.Click += ToolsSpoolCleanButton_Click;
-            flowPanel.Controls.Add(spoolCleanButton);
-
-            // Botão Reiniciar Serviço de Impressão
-            var restartSpoolerButton = new Button
-            {
-                Text = "Reiniciar Serviço de Impressão",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            restartSpoolerButton.Click += ToolsRestartSpoolerButton_Click;
-            flowPanel.Controls.Add(restartSpoolerButton);
-
-            // Botão Testador de Porta
-            var portTesterButton = new Button
-            {
-                Text = "Testador de Porta e Conectividade",
-                Size = new Size(300, 40),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            portTesterButton.Click += ToolsPortTesterButton_Click;
-            flowPanel.Controls.Add(portTesterButton);
-
-            toolsPanel.Controls.Add(flowPanel);
-            tabPage.Controls.Add(toolsPanel);
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Configurações com carregamento de todos os JSONs.
-        /// Permite visualizar e recarregar configurações.
-        /// </summary>
-        private TabPage CreateSettingsTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Configurações",
-                Name = "SettingsTab",
-                Padding = new Padding(10)
-            };
-
-            // Painel de Configurações
-            var settingsPanel = new GroupBox
-            {
-                Text = "Gerenciamento de Configurações",
-                Location = new Point(10, 10),
-                Size = new Size(950, 500),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            var infoLabel = new Label
-            {
-                Text = "Arquivos de Configuração JSON:",
-                Location = new Point(20, 30),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-            settingsPanel.Controls.Add(infoLabel);
-
-            // ListBox de configurações
-            var configListBox = new ListBox
-            {
-                Name = "SettingsConfigListBox",
-                Location = new Point(20, 60),
-                Size = new Size(910, 200),
-                Font = new Font("Segoe UI", 9),
-                SelectionMode = SelectionMode.MultiExtended
-            };
-            configListBox.Items.AddRange(new[] 
-            { 
-                "Config/printers.json - Configuração de impressoras e unidades",
-                "Config/scanners.json - Configuração de scanners",
-                "Config/units.json - Informações de unidades"
-            });
-            settingsPanel.Controls.Add(configListBox);
-
-            // Painel de Botões
-            var buttonsPanel = new FlowLayoutPanel
-            {
-                Location = new Point(20, 270),
-                Size = new Size(910, 50),
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight
-            };
-
-            var reloadButton = new Button
-            {
-                Text = "Recarregar Configurações",
-                Size = new Size(180, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            reloadButton.Click += SettingsReloadButton_Click;
-            buttonsPanel.Controls.Add(reloadButton);
-
-            var openFolderButton = new Button
-            {
-                Text = "Abrir Pasta Config",
-                Size = new Size(150, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            openFolderButton.Click += SettingsOpenFolderButton_Click;
-            buttonsPanel.Controls.Add(openFolderButton);
-
-            settingsPanel.Controls.Add(buttonsPanel);
-
-            // Painel de Status de Configuração
-            var statusLabel = new Label
-            {
-                Text = "Status dos Arquivos:",
-                Location = new Point(20, 330),
-                Size = new Size(300, 25),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-            settingsPanel.Controls.Add(statusLabel);
-
-            var statusTextBox = new RichTextBox
-            {
-                Name = "SettingsStatusRichTextBox",
-                Location = new Point(20, 360),
-                Size = new Size(910, 120),
-                Font = new Font("Segoe UI", 8),
-                ReadOnly = true,
-                BackColor = Color.WhiteSmoke
-            };
-            statusTextBox.Text = "Clique em 'Recarregar Configurações' para atualizar";
-            settingsPanel.Controls.Add(statusTextBox);
-
-            tabPage.Controls.Add(settingsPanel);
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Logs com RichTextBox somente leitura para exibição de eventos.
-        /// </summary>
-        private TabPage CreateLogsTab()
-        {
-            var tabPage = new TabPage
-            {
-                Text = "Logs",
-                Name = "LogsTab",
-                Padding = new Padding(10)
-            };
-
-            // Painel de Logs
-            var logsPanel = new GroupBox
-            {
-                Text = "Registro de Eventos",
-                Location = new Point(10, 10),
-                Size = new Size(950, 500),
-                Font = new Font("Segoe UI", 10, FontStyle.Bold)
-            };
-
-            // RichTextBox Logs
-            _logsRichTextBox = new RichTextBox
-            {
-                Name = "LogsRichTextBox",
-                Location = new Point(20, 30),
-                Size = new Size(910, 440),
-                Font = new Font("Consolas", 8),
-                ReadOnly = true,
-                BackColor = Color.Black,
-                ForeColor = Color.Lime,
-                BorderStyle = BorderStyle.Fixed3D
-            };
-            logsPanel.Controls.Add(_logsRichTextBox);
-
-            tabPage.Controls.Add(logsPanel);
-
-            // Painel de Botões
-            var buttonsPanel = new FlowLayoutPanel
-            {
-                Location = new Point(10, 520),
-                Size = new Size(950, 50),
-                AutoSize = true,
-                FlowDirection = FlowDirection.LeftToRight
-            };
-
-            var clearButton = new Button
-            {
-                Text = "Limpar Logs",
-                Size = new Size(120, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = Color.FromArgb(232, 236, 241),
-                ForeColor = GelitaNavy,
-                FlatStyle = FlatStyle.Flat
-            };
-            clearButton.Click += LogsClearButton_Click;
-            buttonsPanel.Controls.Add(clearButton);
-
-            var exportButton = new Button
-            {
-                Text = "Exportar Logs",
-                Size = new Size(120, 35),
-                Font = new Font("Segoe UI", 9),
-                BackColor = GelitaNavy,
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(5, 0, 0, 0)
-            };
-            exportButton.Click += LogsExportButton_Click;
-            buttonsPanel.Controls.Add(exportButton);
-
-            tabPage.Controls.Add(buttonsPanel);
-            return tabPage;
-        }
-
-        /// <summary>
-        /// Cria a aba Sobre com informações da aplicação.
-        /// Mostra: Versão, Autor, Empresa, Descrição.
-        /// </summary>
         private TabPage CreateAboutTab()
         {
             var tabPage = new TabPage
@@ -1554,7 +580,7 @@ namespace GelitaITToolkit.Forms
             };
 
             // Painel Principal
-            var mainPanel = new GroupBox
+            var mainPanel = new WorkspaceCard
             {
                 Text = "Informações da Aplicação",
                 Location = new Point(10, 10),
@@ -1576,7 +602,8 @@ namespace GelitaITToolkit.Forms
             // Versão
             var versionLabel = new Label
             {
-                Text = "Versão: 0.1.0-alpha",
+                Name = "ApplicationVersionLabel",
+                Text = $"Versão: {ApplicationVersion.Display}",
                 Location = new Point(20, 70),
                 Size = new Size(900, 25),
                 Font = new Font("Segoe UI", 10)
@@ -1716,10 +743,7 @@ namespace GelitaITToolkit.Forms
                 if (_units.Count > 0)
                 {
                     // Popular ComboBox de Impressoras
-                    var printersUnitCombo = _tabControl.TabPages["PrintersTab"].Controls.Cast<Control>()
-                        .OfType<GroupBox>().First()
-                        .Controls.Cast<Control>()
-                        .OfType<ComboBox>().FirstOrDefault();
+                    var printersUnitCombo = FindControl<ComboBox>("PrintersUnitComboBox");
 
                     if (printersUnitCombo != null)
                     {
@@ -1750,53 +774,32 @@ namespace GelitaITToolkit.Forms
 
         private void PopulateScannersList(IEnumerable<Scanner> scanners)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList == null)
-                return;
-
-            scannersList.BeginUpdate();
-            scannersList.Items.Clear();
+            _configuredScanners.Rows.Clear();
             foreach (var scanner in scanners)
-                scannersList.Items.Add(scanner);
-            scannersList.EndUpdate();
+            {
+                var index = _configuredScanners.Rows.Add(scanner.Name, scanner.Model, scanner.IpAddress);
+                _configuredScanners.Rows[index].Tag = scanner;
+            }
+            RefreshEmptyStates();
         }
 
         private void ScannersUnitComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            var printersList = FindControl<CheckedListBox>("ScannersPrintersCheckedListBox");
+            _scannerCatalog.Rows.Clear();
             var unitName = FindControl<ComboBox>("ScannersUnitComboBox")?.SelectedItem?.ToString();
-            if (printersList == null)
-                return;
-
-            printersList.Items.Clear();
             if (!string.IsNullOrWhiteSpace(unitName) && _units.TryGetValue(unitName, out var unit))
             {
-                var printerOptions = unit.Printers
-                    .Where(printerName => !unit.ScannerExcludedPrinters.Contains(printerName, StringComparer.OrdinalIgnoreCase))
-                    .Select(printerName => new ScannerPrinterOption
-                    {
-                        PrinterName = printerName,
-                        ScannerModel = unit.ScannerModels.TryGetValue(printerName, out var model) ? model : null
-                    })
-                    .Cast<object>()
-                    .ToArray();
-                printersList.Items.AddRange(printerOptions);
+                foreach (var name in unit.Printers.Where(name => !unit.ScannerExcludedPrinters.Contains(name, StringComparer.OrdinalIgnoreCase)))
+                {
+                    var option = new ScannerPrinterOption { PrinterName = name,
+                        IpAddress = PrinterService.GetPrinterIpAddress(unit, name),
+                        ScannerModel = unit.ScannerModels.TryGetValue(name, out var model) ? model : null };
+                    var index = _scannerCatalog.Rows.Add(false, option.PrinterName,
+                        option.ScannerModel ?? "Modelo não informado", option.IpAddress ?? "IP não cadastrado");
+                    _scannerCatalog.Rows[index].Tag = option;
+                }
             }
-        }
-
-        private static string? GetScannerIpForPrinter(Unit unit, string printerName)
-        {
-            var numberPart = printerName.Split('_').LastOrDefault();
-            if (!int.TryParse(numberPart, out var printerNumber))
-                return null;
-
-            return unit.PrinterIpRange switch
-            {
-                "10.55.44.0/24" => $"10.55.44.{printerNumber}",
-                "10.55.12.42 - 10.55.12.63" when printerNumber is >= 42 and <= 63 => $"10.55.12.{printerNumber}",
-                "10.55.103.130 - 10.55.103.156" when printerNumber is >= 130 and <= 156 => $"10.55.103.{printerNumber}",
-                _ => null
-            };
+            FilterScannerCatalog();
         }
 
         #endregion
@@ -1807,9 +810,6 @@ namespace GelitaITToolkit.Forms
         private void ConfigureResponsiveLayout()
         {
             SetGroupAnchor("DashboardTab", "Informações do Sistema", AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right);
-
-            SetGroupAnchor("PrintersTab", "Seleção", AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right);
-            SetGroupAnchor("PrintersTab", "Impressoras Disponíveis", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
 
             SetGroupAnchor("ScannersTab", "Adicionar Scanner", AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right);
             SetGroupAnchor("ScannersTab", "Impressoras com scanner — selecione uma ou mais", AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right);
@@ -1824,7 +824,6 @@ namespace GelitaITToolkit.Forms
             SetFlowAnchor("LogsTab", AnchorStyles.Bottom | AnchorStyles.Left);
             SetGroupAnchor("AboutTab", "Informações da Aplicação", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
 
-            SetAnchor("PrintersCheckedListBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
             SetAnchor("ScannersPrintersCheckedListBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
             SetAnchor("ScannersListBox", AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right);
             SetAnchor("SettingsConfigListBox", AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right);
@@ -1951,7 +950,7 @@ namespace GelitaITToolkit.Forms
                 ClientSize = new Size(430, 135)
             };
             var label = new Label { Text = instruction, Location = new Point(15, 15), Size = new Size(400, 25) };
-            var comboBox = new ComboBox { Location = new Point(15, 45), Size = new Size(400, 25), DropDownStyle = ComboBoxStyle.DropDownList };
+            var comboBox = new ThemedComboBox { Location = new Point(15, 45), Size = new Size(400, 25), DropDownStyle = ComboBoxStyle.DropDownList };
             comboBox.Items.AddRange(options);
             comboBox.SelectedIndex = 0;
             var confirmButton = new Button { Text = "Continuar", DialogResult = DialogResult.OK, Location = new Point(255, 90), Size = new Size(75, 30) };
@@ -1962,37 +961,57 @@ namespace GelitaITToolkit.Forms
             return dialog.ShowDialog(this) == DialogResult.OK ? comboBox.SelectedItem?.ToString() : null;
         }
 
-        private static async Task<bool> RunProcessAsync(
+        private async Task<bool> RunProcessAsync(
             string fileName,
             string arguments,
             string? workingDirectory = null,
-            TimeSpan? timeout = null)
+            TimeSpan? timeout = null,
+            bool runAsAdmin = false,
+            bool acceptRebootRequired = false)
         {
             Process? process = null;
             try
             {
                 if (!IsAllowedExecutable(fileName))
+                {
+                    _activeOperation?.Fail();
                     return false;
+                }
+
+                ReportOperationStep(_operationBanner?.AccessibleName ?? "Executando operação", "Aguardando o instalador ou comando finalizar. O percentual não é fornecido por este processo.");
 
                 process = Process.Start(new ProcessStartInfo
                 {
                     FileName = fileName,
                     Arguments = arguments,
                     WorkingDirectory = workingDirectory ?? string.Empty,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
+                    UseShellExecute = runAsAdmin,
+                    Verb = runAsAdmin ? "runas" : string.Empty,
+                    CreateNoWindow = !runAsAdmin
                 });
                 if (process == null)
+                {
+                    _activeOperation?.Fail();
                     return false;
+                }
 
                 using var timeoutSource = new System.Threading.CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(30));
                 await process.WaitForExitAsync(timeoutSource.Token);
-                return process.ExitCode == 0;
+                var succeeded = process.ExitCode == 0 || (acceptRebootRequired && process.ExitCode == 3010);
+                if (!succeeded) _activeOperation?.Fail();
+                if (process.ExitCode == 3010) AddLog("Instalação concluída; reinicialização do Windows necessária.", LogLevel.Warning);
+                return succeeded;
             }
             catch
             {
-                if (process is { HasExited: false })
-                    process.Kill(entireProcessTree: true);
+                _activeOperation?.Fail();
+                try
+                {
+                    if (process is { HasExited: false })
+                        process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
                 return false;
             }
             finally
@@ -2308,14 +1327,12 @@ namespace GelitaITToolkit.Forms
         private async Task LoadPrintersForUnitAsync(string unitName)
         {
             var unit = _configService.GetUnit(unitName);
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null)
+            var printersGrid = FindControl<DataGridView>("PrintersGrid");
+            if (unit == null || printersGrid == null)
                 return;
 
             var printers = await _printerService.GetPrintersByUnit(unit);
-            printersList.Items.Clear();
-            foreach (var printer in printers)
-                printersList.Items.Add(printer, _printerService.IsPrinterInstalled(printer.Name));
+            PopulatePrinterGrid(printers, System.Drawing.Printing.PrinterSettings.InstalledPrinters.Cast<string>().ToList());
 
             AddLog($"{printers.Count} impressora(s) carregada(s) para {unit.Name}.", LogLevel.Info);
         }
@@ -2344,6 +1361,14 @@ namespace GelitaITToolkit.Forms
         /// <param name="level">O nível do log (Info, Warning, Error).</param>
         private void AddLog(string message, LogLevel level)
         {
+            if (IsDisposed || Disposing) return;
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => AddLog(message, level)));
+                return;
+            }
+            if (level == LogLevel.Error) _activeOperation?.Fail();
+            else if (level == LogLevel.Warning) _activeOperation?.Warn();
             if (_logsRichTextBox == null)
                 return;
 
@@ -2368,7 +1393,7 @@ namespace GelitaITToolkit.Forms
         {
             MessageBox.Show(
                 "Gelita IT Toolkit\n" +
-                "Versão 0.1.0-alpha\n\n" +
+                $"Versão {ApplicationVersion.Display}\n\n" +
                 "Ferramenta interna desenvolvida para automatizar atividades do Service Desk da Gelita.\n\n" +
                 "Desenvolvido para Gelita AG - Service Desk\n\n" +
                 "© 2026 - Todos os direitos reservados",
@@ -2396,39 +1421,26 @@ namespace GelitaITToolkit.Forms
 
         private void PrintersSearchButton_Click(object sender, EventArgs e)
         {
-            var searchBox = FindControl<TextBox>("PrintersSearchTextBox");
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (searchBox == null || printersList == null)
-                return;
-
-            var query = searchBox.Text.Trim();
-            for (var index = 0; index < printersList.Items.Count; index++)
-            {
-                var printerName = printersList.Items[index]?.ToString() ?? string.Empty;
-                printersList.SetItemCheckState(index,
-                    string.IsNullOrWhiteSpace(query) || printerName.Contains(query, StringComparison.OrdinalIgnoreCase)
-                        ? CheckState.Checked
-                        : CheckState.Unchecked);
-            }
+            ApplyPrinterGridFilter();
         }
 
-        private async void PrintersInstallButton_Click(object? sender, EventArgs e)
+        private async Task PrintersInstallCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var printers = GetCheckedPrinters();
+            if (unit == null || printers.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var printers = printersList.CheckedItems.Cast<Printer>().ToList();
-            var installed = await _printerService.InstallMultiplePrinters(printers);
+            ReportOperationStep("Instalando impressoras selecionadas");
+            var installed = await _printerService.InstallMultiplePrinters(printers, CreatePrinterProgress());
             AddLog(installed ? "Impressoras instaladas com sucesso." : "Não foi possível instalar uma ou mais impressoras.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Impressoras instaladas com sucesso." : "Falha ao instalar uma ou mais impressoras.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
 
-        private async void PrintersInstallAllButton_Click(object? sender, EventArgs e)
+        private async Task PrintersInstallAllCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
             if (unit == null)
@@ -2437,58 +1449,58 @@ namespace GelitaITToolkit.Forms
                 return;
             }
 
-            var installed = await _printerService.InstallAllForUnit(unit);
+            ReportOperationStep("Instalando impressoras da unidade");
+            var installed = await _printerService.InstallAllForUnit(unit, CreatePrinterProgress());
             AddLog(installed ? $"Impressoras da unidade {unit.Name} instaladas." : $"Falha ao instalar as impressoras da unidade {unit.Name}.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Instalação concluída." : "A instalação não foi concluída. Verifique a rede e o log.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
 
-        private async void PrintersRemoveButton_Click(object? sender, EventArgs e)
+        private async Task PrintersRemoveCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var selectedPrinters = GetCheckedPrinters();
+            if (unit == null || selectedPrinters.Count == 0)
             {
                 MessageBox.Show("Selecione uma unidade e pelo menos uma impressora.", "Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
-            var removed = printersList.CheckedItems.Count == printersList.Items.Count
-                ? await _printerService.RemoveAllForUnit(unit)
-                : true;
-
-            if (printersList.CheckedItems.Count != printersList.Items.Count)
-            {
-                foreach (var printer in printersList.CheckedItems.Cast<Printer>())
-                    removed &= await _printerService.RemovePrinter(printer.Name, unit);
-            }
+            ReportOperationStep("Removendo impressoras selecionadas");
+            var removed = true;
+            foreach (var printer in selectedPrinters)
+                removed &= await _printerService.RemovePrinter(printer.Name, unit);
 
             AddLog(removed ? "Impressoras removidas com sucesso." : "Não foi possível remover uma ou mais impressoras.", removed ? LogLevel.Info : LogLevel.Error);
         }
 
-        private async void PrintersRefreshButton_Click(object? sender, EventArgs e)
+        private async Task PrintersRefreshCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
             if (unit != null)
+            {
+                ReportOperationStep("Atualizando impressoras", "Consultando as impressoras da unidade selecionada.");
                 await LoadPrintersForUnitAsync(unit.Name);
+            }
         }
 
-        private async void PrintersPingButton_Click(object? sender, EventArgs e)
+        private async Task PrintersPingCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
-            var printersList = FindControl<CheckedListBox>("PrintersCheckedListBox");
-            if (unit == null || printersList == null || printersList.CheckedItems.Count == 0)
+            var selectedPrinters = GetCheckedPrinters();
+            if (unit == null || selectedPrinters.Count == 0)
             {
                 MessageBox.Show("Selecione uma ou mais impressoras para testar o ping.", "Teste de Ping", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var results = new List<string>();
-            foreach (var printer in printersList.CheckedItems.Cast<Printer>())
+            foreach (var printer in selectedPrinters)
             {
                 var printerName = printer.Name;
-                var ipAddress = GetScannerIpForPrinter(unit, printerName);
+                var ipAddress = printer.IpAddress;
                 if (string.IsNullOrWhiteSpace(ipAddress))
                 {
+                    _activeOperation?.Warn();
                     results.Add($"{printerName}: IP não configurado para esta unidade.");
                     continue;
                 }
@@ -2496,11 +1508,14 @@ namespace GelitaITToolkit.Forms
                 try
                 {
                     using var ping = new Ping();
+                    ReportOperationStep("Testando impressora", printerName + " - " + ipAddress);
                     var reply = await ping.SendPingAsync(ipAddress, 1500);
+                    if (reply.Status != IPStatus.Success) _activeOperation?.Warn();
                     results.Add($"{printerName} ({ipAddress}): {(reply.Status == IPStatus.Success ? $"OK — {reply.RoundtripTime} ms" : reply.Status.ToString())}");
                 }
                 catch (Exception ex)
                 {
+                    _activeOperation?.Warn();
                     results.Add($"{printerName} ({ipAddress}): falha — {ex.Message}");
                 }
             }
@@ -2510,7 +1525,7 @@ namespace GelitaITToolkit.Forms
             MessageBox.Show(summary, "Teste de Ping das Impressoras", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        private async void PrintersAddButton_Click(object? sender, EventArgs e)
+        private async Task PrintersAddCoreAsync(object? sender, EventArgs e)
         {
             var unit = GetSelectedUnit();
             if (unit == null)
@@ -2524,6 +1539,7 @@ namespace GelitaITToolkit.Forms
                 return;
 
             var printer = new Printer(printerName.Trim(), unit.PrintServer, printerName.Trim(), unit.Name, string.Empty);
+            ReportOperationStep("Adicionando impressora " + printerName);
             var installed = await _printerService.InstallPrinter(printer);
             AddLog(installed ? $"Impressora {printerName} instalada." : $"Falha ao instalar {printerName}.", installed ? LogLevel.Info : LogLevel.Error);
             MessageBox.Show(installed ? "Impressora instalada com sucesso." : "Não foi possível instalar a impressora.", "Impressoras", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Error);
@@ -2531,15 +1547,17 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA SCANNERS ====
 
-        private void ScannersAddButton_Click(object sender, EventArgs e)
+        private async Task ScannersAddCoreAsync(object sender, EventArgs e)
         {
             var modelCombo = FindControl<ComboBox>("ScannersModelComboBox");
-            var printersList = FindControl<CheckedListBox>("ScannersPrintersCheckedListBox");
             var ipBox = FindControl<TextBox>("ScannersIPTextBox");
             var unitName = FindControl<ComboBox>("ScannersUnitComboBox")?.SelectedItem?.ToString();
             var unit = !string.IsNullOrWhiteSpace(unitName) && _units.TryGetValue(unitName, out var selectedUnit) ? selectedUnit : null;
             var model = modelCombo?.SelectedItem?.ToString();
-            var printerOptions = printersList?.CheckedItems.Cast<ScannerPrinterOption>().ToList() ?? new List<ScannerPrinterOption>();
+            _scannerCatalog.EndEdit();
+            var printerOptions = _scannerCatalog.Rows.Cast<DataGridViewRow>()
+                .Where(row => row.Cells["Selected"].Value is true)
+                .Select(row => (ScannerPrinterOption)row.Tag).ToList();
             var manualIpAddress = ipBox?.Text.Trim();
 
             if (unit == null || string.IsNullOrWhiteSpace(model) || printerOptions.Count == 0)
@@ -2555,11 +1573,12 @@ namespace GelitaITToolkit.Forms
 
             foreach (var printerOption in printerOptions)
             {
+                ReportOperationStep("Configurando scanners", $"{printerOptions.IndexOf(printerOption) + 1} de {printerOptions.Count} · {printerOption.PrinterName}");
                 var printerName = printerOption.PrinterName;
                 var scannerModel = printerOption.ScannerModel ?? model;
                 var ipAddress = printerOptions.Count == 1 && !string.IsNullOrWhiteSpace(manualIpAddress)
                     ? manualIpAddress
-                    : GetScannerIpForPrinter(unit, printerName);
+                    : PrinterService.GetPrinterIpAddress(unit, printerName);
 
                 if (string.IsNullOrWhiteSpace(ipAddress) || !IPAddress.TryParse(ipAddress, out _))
                 {
@@ -2568,7 +1587,13 @@ namespace GelitaITToolkit.Forms
                 }
 
                 var scanner = new Scanner(scannerModel, ipAddress, printerName, printerName, string.Empty, printerName, Guid.NewGuid().ToString("B"));
-                if (!epsonService.TryConfigureEpsonScanner(scanner, out var epsonMessage))
+                var configuration = await Task.Run(() =>
+                {
+                    var success = epsonService.TryConfigureEpsonScanner(scanner, out var resultMessage);
+                    return (Success: success, Message: resultMessage);
+                });
+                var epsonMessage = configuration.Message;
+                if (!configuration.Success)
                 {
                     failed.Add($"{printerName}: {epsonMessage}");
                     AddLog(epsonMessage, LogLevel.Warning);
@@ -2581,19 +1606,24 @@ namespace GelitaITToolkit.Forms
                 AddLog(epsonMessage, LogLevel.Info);
             }
 
-            if (added.Count > 0 && _configService.SaveScanners(scanners))
-                PopulateScannersList(scanners);
+            if (added.Count > 0)
+            {
+                if (_configService.SaveScanners(scanners)) PopulateScannersList(scanners);
+                else AddLog("Os scanners foram configurados, mas não foi possível salvar a configuração local.", LogLevel.Error);
+            }
 
             var message = $"Adicionados ({added.Count}):\n{string.Join(Environment.NewLine, added)}";
             if (failed.Count > 0)
+            {
+                AddLog($"{failed.Count} scanner(s) não foram configurados.", added.Count == 0 ? LogLevel.Error : LogLevel.Warning);
                 message += $"\n\nNão adicionados ({failed.Count}):\n{string.Join(Environment.NewLine, failed)}";
+            }
             MessageBox.Show(message, "Adicionar Scanners", MessageBoxButtons.OK, failed.Count == 0 ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private void ScannersRemoveButton_Click(object sender, EventArgs e)
+        private async Task ScannersRemoveCoreAsync(object sender, EventArgs e)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList?.SelectedItem is not Scanner scanner)
+            if (SelectedConfiguredScanner() is not Scanner scanner)
             {
                 MessageBox.Show("Selecione um scanner na lista para remover.", "Remover Scanner", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -2603,11 +1633,19 @@ namespace GelitaITToolkit.Forms
                 return;
 
             var epsonService = new ScannerService();
-            var removedFromEpson = epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var epsonMessage);
+            ReportOperationStep("Removendo scanner", scanner.Name);
+            var removal = await Task.Run(() =>
+            {
+                var success = epsonService.TryRemoveEpsonScanner(scanner.IpAddress, out var resultMessage);
+                return (Success: success, Message: resultMessage);
+            });
+            var removedFromEpson = removal.Success;
+            var epsonMessage = removal.Message;
             var scanners = _configService.LoadScanners();
             scanners.RemoveAll(configured => string.Equals(configured.IpAddress, scanner.IpAddress, StringComparison.OrdinalIgnoreCase));
             if (_configService.SaveScanners(scanners))
                 PopulateScannersList(scanners);
+            else AddLog("Não foi possível salvar a lista após a remoção do scanner.", LogLevel.Error);
 
             AddLog(epsonMessage, removedFromEpson ? LogLevel.Info : LogLevel.Warning);
             MessageBox.Show(
@@ -2619,10 +1657,9 @@ namespace GelitaITToolkit.Forms
                 removedFromEpson ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
-        private async void ScannersPingButton_Click(object sender, EventArgs e)
+        private async Task ScannersPingCoreAsync(object sender, EventArgs e)
         {
-            var scannersList = FindControl<ListBox>("ScannersListBox");
-            if (scannersList?.SelectedItem is not Scanner scanner)
+            if (SelectedConfiguredScanner() is not Scanner scanner)
             {
                 MessageBox.Show("Selecione um scanner na lista para testar o ping.", "Teste de Ping", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -2631,6 +1668,7 @@ namespace GelitaITToolkit.Forms
             try
             {
                 using var ping = new Ping();
+                ReportOperationStep("Testando scanner", scanner.Name + " - " + scanner.IpAddress);
                 var reply = await ping.SendPingAsync(scanner.IpAddress, 1500);
                 var result = reply.Status == IPStatus.Success
                     ? $"{scanner.Name} ({scanner.IpAddress}) respondeu em {reply.RoundtripTime} ms."
@@ -2648,66 +1686,82 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA INSTALAÇÕES ====
 
-        private async void InstallationsInstallButton_Click(object? sender, EventArgs e)
+        private async Task InstallSelectedApplicationsAsync()
         {
             var napsCheckbox = FindControl<CheckBox>("InstallNapsCheckbox");
             var epsonCheckbox = FindControl<CheckBox>("InstallEpsonScanCheckbox");
             var sentinelOneCheckbox = FindControl<CheckBox>("InstallSentinelOneCheckbox");
             var officeCheckbox = FindControl<CheckBox>("InstallOfficeCheckbox");
             var paloAltoCheckbox = FindControl<CheckBox>("InstallPaloAltoCheckbox");
+            var chromeCheckbox = FindControl<CheckBox>("InstallChromeCheckbox");
+            var pawnIoCheckbox = FindControl<CheckBox>("InstallPawnIoCheckbox");
             if (napsCheckbox?.Checked != true &&
                 epsonCheckbox?.Checked != true &&
                 sentinelOneCheckbox?.Checked != true &&
                 officeCheckbox?.Checked != true &&
-                paloAltoCheckbox?.Checked != true)
+                paloAltoCheckbox?.Checked != true &&
+                chromeCheckbox?.Checked != true &&
+                pawnIoCheckbox?.Checked != true)
             {
                 MessageBox.Show("Selecione ao menos um software para iniciar a instalação.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
+            if (pawnIoCheckbox?.Checked == true)
+                await InstallPawnIoCoreAsync();
+
+            if (chromeCheckbox?.Checked == true)
+            {
+                ReportOperationStep("Instalando Google Chrome");
+                await InstallGoogleChromeAsync();
+            }
+
             if (epsonCheckbox?.Checked == true)
             {
-                var model = PromptForOption("Driver Epson + Epson Scan 2", "Selecione o modelo da impressora/scanner:", "Epson WF-C5899", "Epson WF-M5899");
-                if (model != null)
+                ReportOperationStep("Instalando Epson Scan e drivers");
+                var epsonDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "EpsonScan2");
+                var packages = new[]
                 {
-                    var epsonDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "EpsonScan2");
-                    var fileToken = model.Contains("M5899", StringComparison.OrdinalIgnoreCase) ? "M5899" : "C5890";
-                    var installer = Directory.Exists(epsonDirectory)
-                        ? Directory.EnumerateFiles(epsonDirectory, "*.exe").FirstOrDefault(file => Path.GetFileName(file).Contains(fileToken, StringComparison.OrdinalIgnoreCase))
-                        : null;
+                    (Model: "Epson WF-C5899", FileName: "WFC5810_C5890_EScan2_67810_AM.exe", Hash: EpsonC5890Sha256),
+                    (Model: "Epson WF-M5899", FileName: "WFM5899_EScan2_67810_AM.exe", Hash: EpsonM5899Sha256)
+                };
+                var results = new List<string>();
+                var allInstalled = true;
+                foreach (var package in packages)
+                {
+                    var installer = Path.Combine(epsonDirectory, package.FileName);
+                    var installed = false;
+                    string result;
 
-                    if (installer == null)
+                    if (!File.Exists(installer))
                     {
-                        MessageBox.Show($"Instalador do Epson Scan 2 para {model} não encontrado em Assets\\EpsonScan2.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        AddLog($"Instalador Epson Scan 2 não encontrado para {model}.", LogLevel.Warning);
+                        result = $"{package.Model}: instalador não encontrado em Assets\\EpsonScan2.";
                     }
-                    else if (!SecurityHelper.HasExpectedSha256(
-                                 installer,
-                                 fileToken == "M5899" ? EpsonM5899Sha256 : EpsonC5890Sha256))
+                    else if (!SecurityHelper.HasExpectedSha256(installer, package.Hash))
                     {
-                        MessageBox.Show(
-                            "A integridade do instalador Epson não pôde ser confirmada. A execução foi bloqueada.",
-                            "Segurança",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                        AddLog($"Instalador Epson bloqueado por divergência de SHA-256: {installer}.", LogLevel.Error);
+                        result = $"{package.Model}: execução bloqueada por divergência de SHA-256.";
                     }
                     else
                     {
-                        var installed = await RunProcessAsync(installer, "/S");
-                        AddLog(installed
-                            ? $"Driver Epson e Epson Scan 2 instalados para {model}."
-                            : $"A instalação silenciosa do driver Epson retornou falha para {model}.",
-                            installed ? LogLevel.Info : LogLevel.Error);
-
-                        if (!installed)
-                            MessageBox.Show("O instalador do driver Epson não concluiu no modo silencioso. Verifique o log ou execute o pacote manualmente.", "Instalações", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        AddLog($"Iniciando instalação do driver e Epson Scan 2 para {package.Model}.", LogLevel.Info);
+                        installed = await InstallEpsonSilentlyAsync(installer, package.Hash);
+                        result = installed
+                            ? $"{package.Model}: driver e Epson Scan 2 instalados."
+                            : $"{package.Model}: instalação não concluída ou solicitação de administrador cancelada.";
                     }
+
+                    allInstalled &= installed;
+                    results.Add(result);
+                    AddLog(result, installed ? LogLevel.Info : LogLevel.Error);
                 }
+
+                MessageBox.Show(string.Join(Environment.NewLine, results), "Drivers Epson + Epson Scan 2",
+                    MessageBoxButtons.OK, allInstalled ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
 
             if (napsCheckbox?.Checked == true)
             {
+                ReportOperationStep("Instalando NAPS2");
                 var napsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "NAPS");
                 var installer = Directory.Exists(napsDirectory)
                     ? Directory.EnumerateFiles(napsDirectory, "*.msi").FirstOrDefault() ?? Directory.EnumerateFiles(napsDirectory, "*.exe").FirstOrDefault()
@@ -2745,6 +1799,7 @@ namespace GelitaITToolkit.Forms
 
             if (sentinelOneCheckbox?.Checked == true)
             {
+                ReportOperationStep("Instalando SentinelOne");
                 var sentinelOneDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "SentinelOne");
                 var installer = Directory.Exists(sentinelOneDirectory)
                     ? Directory.EnumerateFiles(sentinelOneDirectory, "*.bat").FirstOrDefault()
@@ -2782,6 +1837,7 @@ namespace GelitaITToolkit.Forms
 
             if (officeCheckbox?.Checked == true)
             {
+                ReportOperationStep("Instalando Microsoft Office");
                 const string odtDirectory = @"C:\ODT";
                 var setupPath = Path.Combine(odtDirectory, "setup.exe");
                 var configurationPath = Path.Combine(odtDirectory, "Configuração.xml");
@@ -2843,6 +1899,7 @@ namespace GelitaITToolkit.Forms
 
             if (paloAltoCheckbox?.Checked == true)
             {
+                ReportOperationStep("Instalando GlobalProtect");
                 var paloAltoDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "PaloAlto Client");
                 var installer = Path.Combine(paloAltoDirectory, "GlobalProtect64.msi");
 
@@ -2890,51 +1947,57 @@ namespace GelitaITToolkit.Forms
             }
         }
 
-        // ==== ABA CITRIX ====
-
-        private async void CitrixAddStoreButton_Click(object? sender, EventArgs e)
+        private async Task InstallGoogleChromeAsync()
         {
-            if (_citrixStoresComboBox.SelectedItem is not CitrixStoreOption store)
+            var chromeDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Chrome");
+            var installer = Path.Combine(chromeDirectory, "googlechromestandaloneenterprise64.msi");
+            if (!Environment.Is64BitOperatingSystem)
             {
-                MessageBox.Show("Selecione uma loja Citrix.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Este pacote do Google Chrome requer Windows de 64 bits.", "Google Chrome", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AddLog("Instalação do Google Chrome bloqueada: Windows de 32 bits.", LogLevel.Warning);
                 return;
             }
 
-            var selfServicePath = FindCitrixSelfServiceExecutable();
-            if (selfServicePath == null)
+            if (!File.Exists(installer))
             {
-                AddLog("Citrix Workspace nÃ£o encontrado para adicionar a loja.", LogLevel.Warning);
-                MessageBox.Show("O Citrix Workspace nÃ£o foi encontrado neste computador. Instale-o antes de adicionar uma loja.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Instalador do Google Chrome não encontrado em Assets\\Chrome\\googlechromestandaloneenterprise64.msi.", "Google Chrome", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AddLog("Instalador do Google Chrome não encontrado.", LogLevel.Warning);
                 return;
             }
 
-            var configured = await RunProcessAsync(
-                selfServicePath,
-                $"storebrowse -a \"{store.DiscoveryUrl}\"",
-                Path.GetDirectoryName(selfServicePath));
-
-            AddLog(configured
-                ? $"Loja Citrix adicionada: {store.Name} ({store.DiscoveryUrl})."
-                : $"Falha ao adicionar a loja Citrix: {store.Name}.",
-                configured ? LogLevel.Info : LogLevel.Error);
-
-            if (configured)
+            if (!SecurityHelper.HasExpectedSha256(installer, ChromeSha256))
             {
-                UpdateStatusLabel($"Loja Citrix adicionada: {store.Name}.");
-                MessageBox.Show($"A loja \"{store.Name}\" foi adicionada ao Citrix Workspace.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("A integridade do instalador Google Chrome não pôde ser confirmada. A execução foi bloqueada.", "Segurança", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AddLog("Instalador Google Chrome bloqueado por divergência de SHA-256.", LogLevel.Error);
+                return;
             }
-            else
-            {
-                MessageBox.Show("NÃ£o foi possÃ­vel adicionar a loja. Verifique se o Citrix Workspace estÃ¡ aberto, atualizado e se a rede permite acessar o endereÃ§o selecionado.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
+
+            AddLog("Iniciando instalação silenciosa do Google Chrome.", LogLevel.Info);
+            var installed = await RunProcessAsync(
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "msiexec.exe"),
+                $"/i \"{installer}\" /qn /norestart",
+                chromeDirectory,
+                runAsAdmin: true,
+                acceptRebootRequired: true);
+
+            AddLog(installed
+                ? "Instalação do Google Chrome concluída."
+                : "O Google Chrome não foi instalado ou a solicitação de administrador foi cancelada.",
+                installed ? LogLevel.Info : LogLevel.Error);
+            MessageBox.Show(installed
+                ? "O Google Chrome foi instalado."
+                : "Não foi possível instalar o Google Chrome. Autorize a solicitação de administrador e verifique o log.",
+                "Google Chrome", MessageBoxButtons.OK, installed ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
+
+        // ==== ABA CITRIX ====
 
         private void CitrixOpenWorkspaceButton_Click(object? sender, EventArgs e)
         {
             var selfServicePath = FindCitrixSelfServiceExecutable();
             if (selfServicePath == null)
             {
-                MessageBox.Show("O Citrix Workspace nÃ£o foi encontrado neste computador.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("O Citrix Workspace não foi encontrado neste computador.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -2950,8 +2013,8 @@ namespace GelitaITToolkit.Forms
             }
             catch (Exception ex)
             {
-                AddLog($"NÃ£o foi possÃ­vel abrir o Citrix Workspace: {ex.Message}", LogLevel.Error);
-                MessageBox.Show("NÃ£o foi possÃ­vel abrir o Citrix Workspace.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AddLog($"Não foi possível abrir o Citrix Workspace: {ex.Message}", LogLevel.Error);
+                MessageBox.Show("Não foi possível abrir o Citrix Workspace.", "Citrix", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -3076,18 +2139,6 @@ namespace GelitaITToolkit.Forms
 
         // ==== ABA CONFIGURAÇÕES ====
 
-        private void SettingsReloadButton_Click(object sender, EventArgs e)
-        {
-            // Stub: Será implementado na Fase 4
-            AddLog("Recarregamento de configurações - Não implementado", LogLevel.Info);
-        }
-
-        private void SettingsOpenFolderButton_Click(object sender, EventArgs e)
-        {
-            // Stub: Será implementado na Fase 4
-            AddLog("Abertura da pasta Config - Não implementado", LogLevel.Info);
-        }
-
         // ==== ABA LOGS ====
 
         private void LogsClearButton_Click(object sender, EventArgs e)
@@ -3097,12 +2148,6 @@ namespace GelitaITToolkit.Forms
                 _logsRichTextBox.Clear();
                 AddLog("Logs foram limpos", LogLevel.Info);
             }
-        }
-
-        private void LogsExportButton_Click(object sender, EventArgs e)
-        {
-            // Stub: Será implementado na Fase 4
-            AddLog("Exportação de logs - Não implementado", LogLevel.Info);
         }
 
         #endregion

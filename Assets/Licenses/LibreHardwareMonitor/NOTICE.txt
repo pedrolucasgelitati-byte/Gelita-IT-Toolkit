@@ -1,0 +1,14 @@
+Gelita IT Toolkit includes the unmodified LibreHardwareMonitorLib NuGet package, version 0.9.6.
+Project and corresponding source: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/tree/v0.9.6
+License: Mozilla Public License 2.0. See LICENSE.txt and THIRD-PARTY-NOTICES.txt in this directory.
+
+The Toolkit enables CPU monitoring only. CPU temperature is read through the embedded library
+when the PawnIO prerequisite is available. An optional user-triggered action downloads the
+official PawnIO 2.2.0 installer, validates its pinned SHA-256 and opens its interactive UI
+after explicit confirmation. The Toolkit never installs it automatically or silently.
+Administrative privileges and compatible CPU sensors
+are still required. When direct access is unavailable, previously published CPU sensors
+from Libre Hardware Monitor or Open Hardware Monitor remain a supported fallback.
+
+The displayed reading is the highest valid current CPU temperature reported by the provider.
+ACPI thermal-zone readings are not treated as CPU temperatures.

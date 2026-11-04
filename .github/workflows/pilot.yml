@@ -1,0 +1,40 @@
+name: Pilot validation
+on:
+  push:
+    branches: ['release/1.0.7-pilot']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Reject local credentials, inventories and installer files
+        shell: powershell
+        run: |
+          $forbidden = git ls-files | Where-Object {
+            $_ -match '(^|/)(artifacts|release-worktree-[^/]+|Cache)/' -or
+            $_ -match '(^|/)\.env$|(?i)token.*\.txt$|\.(pfx|p12|key)$' -or
+            $_ -match '^Assets/.*\.(exe|msi|msu)$' -or
+            $_ -match '^Config/(printers|scanners|units)\.json$'
+          }
+          if ($forbidden) { throw 'Local files must not be tracked in the public source.' }
+      - name: Restore with dependency audit
+        run: dotnet restore Gelita-IT-Toolkit.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all -warnaserror:NU1901,NU1902,NU1903,NU1904
+      - name: Checks without changing drivers or Citrix accounts
+        run: dotnet run --project Tests/PilotChecks/PilotChecks.csproj --configuration Release -p:TreatWarningsAsErrors=false -- .
+      - name: Package public pilot
+        shell: powershell
+        run: ./Scripts/Publish-Pilot.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-pilot
+          path: |
+            dist/**/*-public.zip
+            dist/**/*-public.zip.sha256

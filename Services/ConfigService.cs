@@ -1,4 +1,4 @@
-namespace GelitaITToolkit.Services
+﻿namespace GelitaITToolkit.Services
 {
     using System;
     using System.Collections.Generic;
@@ -24,15 +24,24 @@ namespace GelitaITToolkit.Services
         /// Inicializa uma nova instância da classe <see cref="ConfigService"/>.
         /// Define o caminho da pasta Config e configura as opções de serialização JSON.
         /// </summary>
-        public ConfigService()
+        public ConfigService() : this(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config")) { }
+
+        public ConfigService(string configDirectory)
         {
             // Define caminho da pasta Config (raiz do projeto)
-            _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Config");
+            _configPath = configDirectory;
 
             // Cria pasta Config se não existir
             if (!Directory.Exists(_configPath))
             {
                 Directory.CreateDirectory(_configPath);
+            }
+
+            foreach (var name in new[] { "printers", "scanners", "units" })
+            {
+                var target = Path.Combine(_configPath, name + ".json");
+                var template = Path.Combine(_configPath, name + ".example.json");
+                if (!File.Exists(target) && File.Exists(template)) File.Copy(template, target);
             }
 
             // Configura opções de serialização JSON
@@ -139,6 +148,55 @@ namespace GelitaITToolkit.Services
                 return null;
 
             return _unitsCache.ContainsKey(unitName) ? _unitsCache[unitName] : null;
+        }
+
+        /// <summary>Validates every file before replacing the active configuration caches.</summary>
+        public (Dictionary<string, Unit> Units, List<Scanner> Scanners) ReloadConfiguration()
+        {
+            using var printers = ReadConfigurationDocument("printers.json", "units");
+            using var scanners = ReadConfigurationDocument("scanners.json", "scanners");
+            using var unitsInfo = ReadConfigurationDocument("units.json", "units");
+            var nextUnits = new Dictionary<string, Unit>();
+            foreach (var item in printers.RootElement.GetProperty("units").EnumerateArray())
+            {
+                var unit = JsonSerializer.Deserialize<Unit>(item.GetRawText(), _jsonOptions);
+                if (unit == null || string.IsNullOrWhiteSpace(unit.Name) || string.IsNullOrWhiteSpace(unit.PrintServer)
+                    || unit.Printers == null || unit.ScannerModels == null || unit.ScannerExcludedPrinters == null
+                    || unit.Printers.Any(string.IsNullOrWhiteSpace))
+                    throw new InvalidDataException("printers.json contém uma unidade incompleta. Verifique nome, servidor e listas de impressoras.");
+                if (!nextUnits.TryAdd(unit.Name, unit)) throw new InvalidDataException($"Unidade duplicada em printers.json: {unit.Name}.");
+            }
+            var nextScanners = new List<Scanner>();
+            foreach (var item in scanners.RootElement.GetProperty("scanners").EnumerateArray())
+            {
+                var scanner = JsonSerializer.Deserialize<Scanner>(item.GetRawText(), _jsonOptions);
+                if (scanner == null || string.IsNullOrWhiteSpace(scanner.Model) || string.IsNullOrWhiteSpace(scanner.IpAddress))
+                    throw new InvalidDataException("scanners.json contém um scanner sem modelo ou endereço IP.");
+                nextScanners.Add(scanner);
+            }
+            foreach (var item in unitsInfo.RootElement.GetProperty("units").EnumerateArray())
+                if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("name", out var name)
+                    || name.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(name.GetString()))
+                    throw new InvalidDataException("units.json contém uma unidade sem nome.");
+            // No cache is changed when any file is missing, malformed or incomplete.
+            _unitsCache = nextUnits;
+            _scannersCache = nextScanners;
+            _printersCache.Clear();
+            return (nextUnits, nextScanners);
+        }
+
+        private JsonDocument ReadConfigurationDocument(string fileName, string arrayName)
+        {
+            JsonDocument document;
+            try { document = JsonDocument.Parse(File.ReadAllText(Path.Combine(_configPath, fileName))); }
+            catch (JsonException ex) { throw new InvalidDataException($"JSON inválido em {fileName}: {ex.Message}", ex); }
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty(arrayName, out var array) || array.ValueKind != JsonValueKind.Array)
+            {
+                document.Dispose();
+                throw new InvalidDataException($"{fileName} precisa conter a lista '{arrayName}'.");
+            }
+            return document;
         }
 
         /// <summary>

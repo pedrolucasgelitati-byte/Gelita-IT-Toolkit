@@ -87,8 +87,13 @@ namespace GelitaITToolkit.Helpers
             }
             catch
             {
-                if (!process.HasExited)
-                    process.Kill(entireProcessTree: true);
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
                 return false;
             }
         }

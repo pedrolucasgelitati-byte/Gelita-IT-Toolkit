@@ -37,6 +37,10 @@ namespace GelitaITToolkit.Models
         [JsonPropertyName("model")]
         public string Model { get; set; }
 
+        /// <summary>Endereço IP da impressora, quando configurado para a unidade.</summary>
+        [JsonPropertyName("ipAddress")]
+        public string? IpAddress { get; set; }
+
         /// <summary>
         /// Inicializa uma nova instância da classe <see cref="Printer"/>.
         /// </summary>
@@ -63,9 +67,10 @@ namespace GelitaITToolkit.Models
 
         public override string ToString()
         {
-            return string.IsNullOrWhiteSpace(Model)
+            var description = string.IsNullOrWhiteSpace(Model)
                 ? Name
                 : $"{Name} — {Model}";
+            return $"{description} — IP: {(string.IsNullOrWhiteSpace(IpAddress) ? "não configurado" : IpAddress)}";
         }
     }
 }

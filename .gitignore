@@ -1,4 +1,4 @@
-# .gitignore para Gelita IT Tool Kit
+﻿# .gitignore para Gelita IT Tool Kit
 
 # Visual Studio
 .vs/
@@ -93,6 +93,26 @@ signing-settings.local.ps1
 
 # Pacote local do GlobalProtect: o MSI excede o limite de tamanho do GitHub
 Assets/PaloAlto Client/*.msi
+Assets/Chrome/*.msi
 
 # Artefato intermediário de criação do ícone; apenas a versão final é usada pelo aplicativo
 Assets/Icons/Gelita-IT-Toolkit-taskbar-source.png
+
+# Local validation, cached installers and nested checkout snapshots
+artifacts/
+release-worktree-*/
+Cache/
+# Vendor packages are supplied separately to pilot machines
+Assets/**/*.exe
+Assets/**/*.msi
+Assets/**/*.msu
+Assets/**/ConnectInfo.dat
+# Local credentials and signing material, including nested copies
+**/*Token*.txt
+.env.*
+!.env.example
+
+# Site inventory is local; examples are safe to publish
+Config/printers.json
+Config/scanners.json
+Config/units.json
