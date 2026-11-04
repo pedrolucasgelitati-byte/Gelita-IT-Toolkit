@@ -105,16 +105,7 @@
                     }
                 }
 
-                if (_unitsCache.Count == 0)
-                {
-                    MessageBox.Show(
-                        "Nenhuma unidade foi carregada do arquivo printers.json.\n\n" +
-                        "Verifique se o arquivo está corretamente formatado.",
-                        "Aviso: Nenhuma Unidade Carregada",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Warning);
-                }
-
+                // An empty inventory is valid on first launch; the UI shows its empty state.
                 return _unitsCache;
             }
             catch (JsonException ex)
