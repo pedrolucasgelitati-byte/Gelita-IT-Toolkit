@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="../../Services/GitHubInventoryService.cs" Link="GitHubInventoryService.cs" />
     <Compile Include="../../Services/InventoryReport.cs" Link="InventoryReport.cs" />
+    <Compile Include="../../Services/InventoryDashboardSnapshot.cs" Link="InventoryDashboardSnapshot.cs" />
     <Compile Include="../../Helpers/InventoryCredentialStore.cs" Link="InventoryCredentialStore.cs" />
     <Compile Include="../../Helpers/EnvironmentConfig.cs" Link="EnvironmentConfig.cs" />
   </ItemGroup>

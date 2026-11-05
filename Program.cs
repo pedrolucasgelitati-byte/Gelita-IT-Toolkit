@@ -23,6 +23,8 @@ namespace GelitaITToolkit
                 // Habilitar estilos visuais modernos
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                InventoryDashboardSnapshot.TemperatureReader = async token =>
+                    (await CpuTemperatureService.ReadAsync(token).ConfigureAwait(false)).Celsius;
                 if (args.Contains("--export-inventory", StringComparer.OrdinalIgnoreCase))
                 {
                     var settings = GitHubInventorySettings.Load();

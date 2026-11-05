@@ -73,7 +73,7 @@ internal sealed class GitHubInventoryService : IDisposable
                         continue;
                     }
                     var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(settings.Repository.ToUpperInvariant() + "/" + report.MachineName.ToUpperInvariant()))).ToLowerInvariant();
-                    var stamp = Path.Combine(GitHubInventorySettings.Folder, "github-upload-" + hash + ".txt");
+                    var stamp = Path.Combine(GitHubInventorySettings.Folder, "github-upload-v" + report.SchemaVersion.ToString(System.Globalization.CultureInfo.InvariantCulture) + "-" + hash + ".txt");
                     if (File.Exists(stamp) && DateTimeOffset.TryParse(await File.ReadAllTextAsync(stamp, _stop.Token).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var sent)
                         && DateTimeOffset.UtcNow >= sent && DateTimeOffset.UtcNow - sent < TimeSpan.FromHours(24))
                     {

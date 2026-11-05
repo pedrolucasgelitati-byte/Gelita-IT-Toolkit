@@ -11,6 +11,10 @@ telemetria em tempo real e o histórico do Git cresce com cada envio.
 ## App
 
 Ao abrir, o app gera `%LOCALAPPDATA%\GelitaITToolkit\inventory-report.json`.
+O relatório de esquema 2 inclui o dashboard da estação: processador, memória,
+tipo/frequência de RAM, service tag, IP/MAC, uso de CPU/memória, tempo ligado e
+temperatura da CPU quando o sensor já estiver disponível. Nenhum driver é
+instalado para coletar o relatório. Valores ausentes permanecem nulos.
 Esse arquivo pode ser aberto diretamente no painel, sem credencial e sem upload.
 Para gerar o arquivo e sair sem abrir a interface, execute
 `Gelita-IT-Toolkit.exe --export-inventory`.
@@ -35,7 +39,9 @@ Reabra o app após configurar.
 
 O envio inicial espera de 5 a 120 segundos para distribuir requisições.
 Após sucesso, ocorre no máximo um envio por máquina/repositório/conta Windows a
-cada 24 horas, enquanto o app estiver aberto. Falhas são tentadas novamente
+cada 24 horas, enquanto o app estiver aberto. A atualização do esquema permite
+uma nova coleta mesmo quando o relatório antigo foi enviado no mesmo dia.
+Falhas são tentadas novamente
 a cada 30 minutos. Não há serviço nem tarefa agendada; o relatório local é
 atualizado a cada 30 minutos enquanto aberto.
 O último status está em `github-inventory-status.log`, na mesma pasta local.
@@ -48,20 +54,27 @@ O envio informa SHA para atualizar arquivos existentes. Um conflito não sobresc
 
 ## Dados
 
-Nome da máquina, conta que executa o app, unidade configurada, Windows, versão
+Nome da máquina, usuário sem domínio, unidade configurada, Windows, versão
 do Toolkit, presença do SentinelOne, versão do Snow e seu SiteName, quando legíveis.
 Somente esses campos são lidos do Snow; nenhum config, dump ou documento é enviado.
+Sistema, versão de atualização do Windows (por exemplo 25H2), build com revisão
+e arquitetura são campos separados. Os dados do dashboard são uma fotografia
+da coleta, e não representam acompanhamento em tempo real.
 Uma sessão elevada pode informar o usuário administrativo que iniciou o processo.
 
 ## Painel
 
 Use token individual com **Contents: Read-only**, limitado ao repositório privado.
-O token permanece apenas na memória da aba. O painel não usa localStorage,
-sessionStorage, cookies de autenticação ou serviços externos de análise.
+O token permanece apenas na memória da aba. Nenhuma credencial ou relatório é
+salvo em localStorage, sessionStorage ou cookies. Apenas a preferência de tema
+claro/escuro é salva no navegador. Não há serviços externos de análise.
 Ao desconectar ou fechar a aba, os dados e a credencial deixam a sessão.
 O login Microsoft da versão ASP.NET não faz parte deste modo.
 
 O painel lê até 1.000 relatórios (64 KB por arquivo), em lotes de quatro requisições.
+A conexão e a importação ficam na janela **Conectar inventário**. Clicar no nome
+de uma máquina abre seu dashboard no próprio site. Relatórios antigos continuam
+compatíveis; campos não coletados aparecem como **Não informado**.
 A atualização é manual para reduzir chamadas da API. Indicadores descrevem o
 inventário coletado: última coleta não indica disponibilidade online, e instalação
 do SentinelOne não confirma saúde do antivírus.

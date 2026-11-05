@@ -25,6 +25,7 @@ foreach (var existing in new[] { false, true })
     var reportJson = Encoding.UTF8.GetString(Convert.FromBase64String(body.RootElement.GetProperty("content").GetString()!));
     using var payload = JsonDocument.Parse(reportJson);
     Check(payload.RootElement.GetProperty("machineName").GetString() == "TEST-PC", "Report contract matches dashboard");
+    Check(payload.RootElement.GetProperty("schemaVersion").GetInt32() == 2, "Dashboard schema version supplied");
     Check(payload.RootElement.GetProperty("sentinelOneInstalled").ValueKind == JsonValueKind.Null, "Unknown antivirus remains unknown");
     Check(!handler.Body!.Contains("TEST-PC") && body.RootElement.GetProperty("message").GetString() == "Update inventory report", "Commit message excludes machine data");
 }
