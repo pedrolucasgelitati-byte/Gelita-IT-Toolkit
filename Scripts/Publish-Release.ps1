@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [switch] $IncludeLocalConfiguration,
     [switch] $IncludeLocalInstallers
@@ -26,7 +26,7 @@ foreach ($name in @('printers', 'scanners', 'units')) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $payload "Config\$name.json") -Force
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot '.env.example') -Destination $payload
-Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\PILOTO.md') -Destination (Join-Path $payload 'LEIA-ME.md')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\INSTALACAO.md') -Destination (Join-Path $payload 'LEIA-ME.md')
 if ($IncludeLocalConfiguration -and (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
     Copy-Item -LiteralPath (Join-Path $projectRoot '.env') -Destination $payload
 }
@@ -54,7 +54,8 @@ if (!$internalPackage -and (Test-Path -LiteralPath (Join-Path $payload '.env')))
 Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object FullName | ForEach-Object {
     '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.FullName.Substring($payload.Length + 1).Replace('\', '/')
 } | Set-Content -LiteralPath (Join-Path $payload 'SHA256SUMS.txt') -Encoding ascii
-$zip = Join-Path $destination "Gelita-IT-Toolkit-$version-win-x64-$kind.zip"
+$fileSuffix = if ($internalPackage) { "-internal" } else { "" }
+$zip = Join-Path $destination "Gelita-IT-Toolkit-$version-win-x64$fileSuffix.zip"
 Compress-Archive -LiteralPath $payload -DestinationPath $zip
 '{0}  {1}' -f (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path $zip -Leaf) |
     Set-Content -LiteralPath ($zip + '.sha256') -Encoding ascii

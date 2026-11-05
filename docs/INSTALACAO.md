@@ -1,8 +1,8 @@
-# Piloto 1.0.7-pilot.1
+# Versão 1.0.7
 
-Esta versão é para validação em uma máquina piloto Windows x64. A compilação
-e os testes automatizados não substituem os testes de instalação e de login.
-Não iniciar distribuição em massa antes de preencher esta lista.
+Este guia descreve a preparação, a instalação e a verificação do Gelita IT Toolkit
+1.0.7 em Windows x64. A compilação e os testes automatizados não substituem os
+testes de instalação, digitalização e login no ambiente de destino.
 
 ## Preparação
 
@@ -16,11 +16,11 @@ Não iniciar distribuição em massa antes de preencher esta lista.
    `Assets/NAPS` etc. Os pacotes Epson esperados são
    `WFC5810_C5890_EScan2_67810_AM.exe` e `WFM5899_EScan2_67810_AM.exe`.
    O Toolkit confere SHA-256 antes de executá-los.
-6. Não há certificado de assinatura disponível nesta preparação. O pacote de piloto
+6. Não há certificado de assinatura disponível nesta preparação. O pacote 1.0.7
    não é assinado; verificar o SHA-256 e seguir as políticas corporativas de execução.
    Não desabilitar proteções do Windows para abrir o aplicativo.
 
-## Validação na máquina piloto — pendente
+## Verificações no ambiente de destino — pendentes
 
 - [ ] Abrir como usuário comum: a área administrativa não deve ficar disponível sem elevação.
 - [ ] Solicitar acesso administrativo e cancelar o UAC: o aplicativo deve continuar utilizável.
@@ -56,15 +56,15 @@ Em Windows com SDK .NET 8 ou superior:
 
 ```powershell
 dotnet restore Gelita-IT-Toolkit.csproj
-dotnet run --project Tests/PilotChecks/PilotChecks.csproj --configuration Release -- .
-powershell -File Scripts/Publish-Pilot.ps1
+dotnet run --project Tests/ReleaseChecks/ReleaseChecks.csproj --configuration Release -- .
+powershell -File Scripts/Publish-Release.ps1
 ```
 
 Para criar apenas localmente um pacote interno, com configuração e instaladores
 Epson/NAPS presentes neste computador:
 
 ```powershell
-powershell -File Scripts/Publish-Pilot.ps1 -IncludeLocalConfiguration -IncludeLocalInstallers
+powershell -File Scripts/Publish-Release.ps1 -IncludeLocalConfiguration -IncludeLocalInstallers
 ```
 
 Nunca anexar o pacote `internal` ao GitHub público. Tokens SentinelOne, certificados

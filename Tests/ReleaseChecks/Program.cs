@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,7 +7,7 @@ using GelitaITToolkit.Helpers;
 using GelitaITToolkit.Models;
 using GelitaITToolkit.Services;
 
-internal static class PilotChecks
+internal static class ReleaseChecks
 {
     private const BindingFlags HiddenStatic = BindingFlags.Static | BindingFlags.NonPublic;
     private static int passed;
@@ -21,7 +21,7 @@ internal static class PilotChecks
     private static void Main(string[] args)
     {
         var root = args.Length > 0 ? Path.GetFullPath(args[0]) : Directory.GetCurrentDirectory();
-        var temporary = Path.Combine(root, "artifacts", "pilot-checks", Guid.NewGuid().ToString("N"));
+        var temporary = Path.Combine(root, "artifacts", "release-checks", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
         var file = Path.Combine(temporary, "integrity.txt");
         File.WriteAllText(file, "original");
@@ -47,7 +47,7 @@ internal static class PilotChecks
             File.Copy(Path.Combine(root, "Config", name + ".example.json"), Path.Combine(temporary, name + ".example.json"));
         var config = new ConfigService(temporary);
         Check(config.LoadUnits().Count == 0, "New installation starts with an empty inventory");
-        var scanner = new Scanner("Epson WF-M5899", "192.0.2.10", "Pilot", "test", "test", "Pilot", Guid.NewGuid().ToString());
+        var scanner = new Scanner("Epson WF-M5899", "192.0.2.10", "Test", "test", "test", "Test", Guid.NewGuid().ToString());
         Check(config.SaveScanners(new[] { scanner }), "Scanner configuration saved");
         Check(new ConfigService(temporary).LoadScanners().Single().IpAddress == scanner.IpAddress, "Scanner configuration survives reload");
         var withoutTemplates = new ConfigService(Path.Combine(temporary, "without-templates"));

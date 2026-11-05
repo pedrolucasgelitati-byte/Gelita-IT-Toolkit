@@ -1,13 +1,13 @@
-name: Pilot validation
+﻿name: Release validation
 on:
   push:
-    branches: ['release/1.0.7-pilot']
+    branches: ['release/1.0.7']
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: pilot-${{ github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   windows:
@@ -32,13 +32,13 @@ jobs:
         run: dotnet restore Gelita-IT-Toolkit.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all -warnaserror:NU1901,NU1902,NU1903,NU1904
       - name: Checks without changing drivers or Citrix accounts
         timeout-minutes: 4
-        run: dotnet run --project Tests/PilotChecks/PilotChecks.csproj --configuration Release -p:TreatWarningsAsErrors=false -- .
-      - name: Package public pilot
+        run: dotnet run --project Tests/ReleaseChecks/ReleaseChecks.csproj --configuration Release -p:TreatWarningsAsErrors=false -- .
+      - name: Package public release
         shell: powershell
-        run: ./Scripts/Publish-Pilot.ps1
+        run: ./Scripts/Publish-Release.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: public-pilot
+          name: public-release
           path: |
-            dist/**/*-public.zip
-            dist/**/*-public.zip.sha256
+            dist/**/Gelita-IT-Toolkit-*-win-x64.zip
+            dist/**/Gelita-IT-Toolkit-*-win-x64.zip.sha256

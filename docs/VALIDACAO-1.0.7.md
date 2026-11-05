@@ -1,6 +1,6 @@
-# Evidências de preparação do piloto
+# Validação da versão 1.0.7
 
-Data: 4 de novembro de 2026.
+Evidências iniciais: 4 de novembro de 2026. Nomenclatura atualizada em 5 de novembro de 2026.
 
 ## Executado
 
@@ -29,7 +29,7 @@ alterar contas Citrix.
 
 Não foi executada instalação real dos dois drivers, digitalização, autenticação
 Citrix, abertura de aplicativos publicados, reinício ou validação interativa do
-UAC. A lista de aceite está em [PILOTO.md](PILOTO.md).
+UAC. A lista de aceite está em [INSTALACAO.md](INSTALACAO.md).
 
 A varredura automática não prova ausência de todo segredo. Ela cobre as regras
 conhecidas do scanner e as referências disponíveis localmente. Dados de
@@ -37,7 +37,7 @@ infraestrutura podem existir em versões já publicadas do histórico; esta
 preparação não reescreve nem força atualização do histórico remoto.
 
 Não há certificado de assinatura de código no armazenamento pessoal deste
-computador. A distribuição criada é uma prévia sem assinatura, com checksums.
+computador. A distribuição criada não possui assinatura digital e inclui checksums.
 
 A branch local divergiu da main. A revisão de integração deve preservar portal,
 telemetria e a arquitetura presente na main antes de promover a versão.
