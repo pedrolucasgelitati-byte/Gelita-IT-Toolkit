@@ -27,6 +27,7 @@ foreach ($name in @('printers', 'scanners', 'units')) {
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot '.env.example') -Destination $payload
 Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\INSTALACAO.md') -Destination (Join-Path $payload 'LEIA-ME.md')
+Copy-Item -LiteralPath (Join-Path $projectRoot 'docs\GITHUB-INVENTORY.md') -Destination (Join-Path $payload 'INVENTARIO-GITHUB.md')
 if ($IncludeLocalConfiguration -and (Test-Path -LiteralPath (Join-Path $projectRoot '.env'))) {
     Copy-Item -LiteralPath (Join-Path $projectRoot '.env') -Destination $payload
 }

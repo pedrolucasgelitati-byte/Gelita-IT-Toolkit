@@ -33,6 +33,10 @@ jobs:
       - name: Checks without changing drivers or Citrix accounts
         timeout-minutes: 4
         run: dotnet run --project Tests/ReleaseChecks/ReleaseChecks.csproj --configuration Release -p:TreatWarningsAsErrors=false -- .
+      - name: Check GitHub inventory transport and Windows credential vault
+        run: dotnet run --project Tests/GitHubInventoryChecks/GitHubInventoryChecks.csproj --configuration Release
+      - name: Check optional ASP.NET portal transport
+        run: dotnet run --project Tests/PortalChecks/PortalChecks.csproj --configuration Release
       - name: Package public release
         shell: powershell
         run: ./Scripts/Publish-Release.ps1

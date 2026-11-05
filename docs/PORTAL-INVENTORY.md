@@ -1,5 +1,8 @@
 # Inventário no portal
 
+Para hospedagem gratuita somente no GitHub, use [GITHUB-INVENTORY.md](GITHUB-INVENTORY.md).
+As instruções abaixo se aplicam ao backend ASP.NET, que requer servidor próprio.
+
 O Toolkit envia um resumo ao iniciar e a cada cinco minutos enquanto aberto.
 Não instala serviço nem tarefa agendada e não altera o agente Snow.
 

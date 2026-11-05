@@ -341,6 +341,8 @@
 
             // Menu Arquivo
             var fileMenu = new ToolStripMenuItem("&Arquivo");
+            fileMenu.DropDownItems.Add(new ToolStripMenuItem("Inventário GitHub", null,
+                (s, e) => { using var inventory = new GitHubInventoryForm(); inventory.ShowDialog(this); }));
             fileMenu.DropDownItems.Add(new ToolStripMenuItem("&Sair", null, 
                 (s, e) => 
                 {

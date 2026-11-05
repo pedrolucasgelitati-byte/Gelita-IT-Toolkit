@@ -23,6 +23,20 @@ namespace GelitaITToolkit
                 // Habilitar estilos visuais modernos
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                if (args.Contains("--export-inventory", StringComparer.OrdinalIgnoreCase))
+                {
+                    var settings = GitHubInventorySettings.Load();
+                    Directory.CreateDirectory(GitHubInventorySettings.Folder);
+                    File.WriteAllText(Path.Combine(GitHubInventorySettings.Folder, "inventory-report.json"),
+                        System.Text.Json.JsonSerializer.Serialize(InventoryReport.Collect(settings.Unit), GitHubInventorySettings.JsonOptions));
+                    return;
+                }
+                if (args.Contains("--configure-inventory", StringComparer.OrdinalIgnoreCase))
+                {
+                    Application.Run(new GitHubInventoryForm());
+                    return;
+                }
+                using var githubInventory = GitHubInventoryService.Start();
                 using var portalInventory = PortalInventoryService.Start();
                 
                 var access = new WindowsAccessService();

@@ -40,6 +40,13 @@
         {
             _accessService = accessService ?? throw new ArgumentNullException(nameof(accessService));
             Text = "Gelita IT Toolkit — Área do usuário";
+            var inventoryMenu = new MenuStrip();
+            var inventoryFile = new ToolStripMenuItem("Arquivo");
+            inventoryFile.DropDownItems.Add(new ToolStripMenuItem("Inventário GitHub", null,
+                (_, _) => { using var inventory = new GitHubInventoryForm(); inventory.ShowDialog(this); }));
+            inventoryMenu.Items.Add(inventoryFile);
+            Controls.Add(inventoryMenu);
+            MainMenuStrip = inventoryMenu;
             StartPosition = FormStartPosition.CenterScreen;
             Size = new Size(1100, 760);
             MinimumSize = new Size(900, 640);
@@ -299,6 +306,7 @@
             layout.Controls.Add(tabs, 0, 1);
             Controls.Add(layout);
             Load += (_, _) => LoadPrinterCatalog();
+            inventoryMenu.SendToBack();
         }
 
         private TabPage CreateComputerTab()

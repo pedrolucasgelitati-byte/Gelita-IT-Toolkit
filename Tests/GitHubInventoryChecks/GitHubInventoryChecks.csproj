@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Services/GitHubInventoryService.cs" Link="GitHubInventoryService.cs" />
+    <Compile Include="../../Services/InventoryReport.cs" Link="InventoryReport.cs" />
+    <Compile Include="../../Helpers/InventoryCredentialStore.cs" Link="InventoryCredentialStore.cs" />
+    <Compile Include="../../Helpers/EnvironmentConfig.cs" Link="EnvironmentConfig.cs" />
+  </ItemGroup>
+</Project>
