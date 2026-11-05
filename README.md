@@ -1,433 +1,110 @@
-# Gelita IT Toolkit
+<p align="center">
+  <img src="Assets/Icons/Gelita-IT-Toolkit.png" alt="Ícone do Gelita IT Toolkit" width="88">
+</p>
 
-Ferramenta interna e portátil do Service Desk da Gelita para preparar, configurar, diagnosticar e reparar computadores Windows.
+<h1 align="center">Gelita IT Toolkit</h1>
 
-**Versão publicada:** consulte a seção
-[Releases](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest);
-o número é mantido automaticamente no projeto e na tag Git.
-**Plataforma:** Windows x64
-**Tecnologia:** .NET 8 e Windows Forms
+<p align="center">
+  Ferramentas para suporte, configuração e manutenção de estações Windows.
+</p>
 
-> Uso interno. Algumas funções alteram configurações do Windows e precisam ser executadas com uma conta administrativa autorizada.
+<p align="center">
+  <a href="https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest"><strong>Baixar versão mais recente</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#interface-do-programa">Conhecer a interface</a>
+  &nbsp;·&nbsp;
+  <a href="docs/GUIA-TECNICO.md">Documentação técnica</a>
+</p>
 
-## Funcionalidades
+---
+
+O **Gelita IT Toolkit** reúne rotinas do Service Desk em uma aplicação portátil: preparação de computadores, gerenciamento de impressoras e scanners, configuração do Citrix Workspace e diagnóstico do Windows.
+
+O objetivo é padronizar tarefas recorrentes, reduzir etapas manuais e manter as operações organizadas em uma única interface.
+
+| Plataforma | Tecnologia | Distribuição |
+| --- | --- | --- |
+| Windows x64 | C# · .NET 8 · Windows Forms | Pacote portátil com runtime incluído |
+
+## Interface do programa
 
 ### Dashboard
 
-- Identificação do computador, usuário, domínio, IP e endereço MAC.
-- Processador, memória RAM, tipo e frequência da memória.
-- Nome do Windows, versão de recurso instalada e build completo.
-- Diagnóstico de BitLocker, Microsoft Defender, Firewall, Secure Boot e TPM.
-- Verificação do SentinelOne, GlobalProtect e administradores locais.
+Visão centralizada de hardware, sistema operacional, rede e sessão do Windows.
 
-### Impressoras
+![Dashboard do Gelita IT Toolkit em tema escuro](docs/images/dashboard.png)
 
-- Carregamento dos equipamentos de cada unidade pelo arquivo JSON.
-- Pesquisa e seleção de uma ou várias impressoras.
-- Instalação apenas dos equipamentos selecionados ou de toda a unidade.
-- Detecção de filas já instaladas.
-- Definição da impressora padrão e impressão de página de teste.
-- Testes de ping, porta TCP 9100 e página web do equipamento.
-- Correção de filas offline e remoção de configurações duplicadas.
+<sub>Capturas da interface da versão 1.0.7 em ambiente de demonstração. Os dados de identificação, rede e equipamentos foram substituídos por exemplos para preservar informações corporativas.</sub>
 
-### Scanners
+<details>
+<summary><strong>Scanners — seleção de equipamentos e configuração por unidade</strong></summary>
 
-- Configuração de vários scanners no Epson Scan 2.
-- Adição automática dos perfis correspondentes ao NAPS2.
-- Nome dos perfis conforme o padrão de cada unidade.
-- Remoção conjunta das configurações do Epson Scan 2 e NAPS2.
-- Validação de todos os scanners configurados.
-- Sincronização para usuários existentes e usuários de domínio que entrarem futuramente.
-- Verificação da presença do equipamento e teste de digitalização.
+Pesquisa, seleção múltipla e organização dos scanners disponíveis e configurados.
 
-### Instalações
+![Tela de scanners com equipamentos demonstrativos](docs/images/scanners.png)
 
-- Epson Scan 2.
-- NAPS2.
-- SentinelOne.
-- Palo Alto GlobalProtect.
-- Microsoft Office pelo Office Deployment Tool (ODT).
-- Atualização do Windows 11 para as versões 25H2 e 26H2.
+</details>
 
-A ISO corporativa já contém o Windows 11 24H2. O Toolkit oferece a instalação das atualizações para 25H2 e 26H2.
+<details>
+<summary><strong>Citrix — gerenciamento das contas corporativas</strong></summary>
 
-### Citrix
+Seleção das contas CitrixBRInternal e CitrixEB na área administrativa, com aplicação das contas selecionadas.
 
-- Configuração das contas corporativas no Citrix Workspace.
-- Seleção independente de `CitrixBR` e `CitrixEB`.
-- Possibilidade de adicionar uma ou as duas contas.
+![Tela de configuração das contas Citrix com endereço demonstrativo](docs/images/citrix.png)
 
-### Central de reparos
+</details>
 
-- Limpeza de disco e de arquivos temporários.
-- Renovação do endereço IP e limpeza do cache DNS.
-- Redefinição do Winsock e reinício dos serviços de rede.
-- Reparo do Windows Update.
-- Verificações SFC, DISM e CHKDSK.
-- Limpeza e reinício do spooler de impressão.
-- Atualização dos programas com `winget upgrade --all`.
-- Histórico, indicadores de estado e barra de progresso.
+<details>
+<summary><strong>Instalações — aplicativos e drivers em um único lugar</strong></summary>
 
-### Configuração e manutenção
+Seleção dos aplicativos e pacotes necessários para preparar a estação de trabalho.
 
-- Configurações em JSON, atualizáveis sem recompilar.
-- Validação automática dos arquivos JSON.
-- Caminhos de instaladores configuráveis.
-- Backup de impressoras, scanners e configurações.
-- Logs com ocultação de tokens, senhas e outros dados sensíveis.
-- Atualização completa do Toolkit com validação SHA-256, backup e restauração em caso de falha.
+![Tela de seleção de aplicativos e drivers](docs/images/instalacoes.png)
 
-## Como usar a versão portátil
+</details>
 
-1. Baixe o ZIP da versão desejada na seção **Releases** do GitHub.
-2. Extraia todo o conteúdo para uma pasta local ou para o pendrive.
-3. Mantenha as pastas `Assets` e `Config` ao lado do executável.
-4. Segure **Shift** e clique com o botão direito em `Gelita-IT-Toolkit.exe`.
-5. Escolha **Executar como outro usuário**.
-6. Informe uma conta administrativa autorizada do Service Desk.
+## Funcionalidades
 
-Também é possível iniciar pelo arquivo `Abrir-Gelita-IT-Toolkit.cmd`.
-
-Não execute o programa diretamente de dentro do ZIP. A versão publicada é autossuficiente e não exige a instalação do .NET na máquina do usuário.
-
-## Requisitos
-
-### Para executar
-
-- Windows 10 ou Windows 11 de 64 bits.
-- Credenciais administrativas para instalações e reparos.
-- Acesso à rede corporativa quando o recurso depender de servidores internos.
-- Drivers e instaladores correspondentes dentro da pasta `Assets`.
-
-### Para desenvolver
-
-- Windows 10 ou Windows 11.
-- .NET 8 SDK.
-- Visual Studio 2022 ou Visual Studio Code com suporte a C#.
-- Git, caso as alterações sejam versionadas.
-
-O erro **“dotnet não é reconhecido”** significa que o SDK não está instalado ou não está no `PATH`. Isso afeta somente a compilação pelo código-fonte; para máquinas de usuários, utilize o executável autossuficiente publicado.
-
-## Estrutura principal
-
-```text
-installerprinters/
-├── Assets/                         Instaladores, ícone e pacotes auxiliares
-├── Config/                         Configurações JSON
-├── Forms/                          Interface Windows Forms
-├── Models/                         Contratos de dados
-├── Services/                       Instalação, diagnóstico e integrações
-├── Program.cs                      Ponto de entrada
-├── Gelita-IT-Toolkit.csproj        Configuração do projeto
-├── Gelita-IT-Toolkit.sln           Solução do Visual Studio
-├── Abrir-Gelita-IT-Toolkit.cmd     Inicializador auxiliar
-└── README.md                       Documentação consolidada
-```
-
-Os instaladores grandes ou confidenciais podem estar ignorados pelo Git. Eles precisam existir localmente antes da publicação do pacote.
-
-## Arquivos de configuração
-
-| Arquivo | Finalidade |
+| Área | Recursos |
 | --- | --- |
-| `Config/printers.json` | Impressoras e scanners de cada unidade |
-| `Config/toolkit-settings.json` | Caminhos dos programas, pacotes e recursos |
-| `Config/installer-hashes.json` | Hashes SHA-256 permitidos para instaladores |
-| `Config/security-policy.json` | Política e lista permitida de administradores locais |
+| **Dashboard** | Informações do computador, hardware, versão instalada do Windows e build completo. |
+| **Impressoras** | Organização por unidade, instalação individual ou em lote, impressora padrão, página de teste e diagnóstico de conectividade. |
+| **Scanners** | Configuração de equipamentos Epson, seleção múltipla, perfis de digitalização e integração com NAPS2. |
+| **Instalações** | Drivers Epson, Epson Scan 2, NAPS2 e aplicativos corporativos, conforme os pacotes disponíveis no ambiente. |
+| **Citrix Workspace** | Configuração das contas CitrixBRInternal e CitrixEB. Na área administrativa, seleção de uma ou ambas e remoção das contas gerenciadas desmarcadas. |
+| **Windows** | Instalação das atualizações 25H2 e 26H2. A ISO corporativa já contém o Windows 11 24H2. |
+| **Diagnóstico e manutenção** | Ferramentas de rede, verificações do sistema, reparos e manutenção do spooler de impressão. |
+| **Configurações e logs** | Configuração externa, validação de integridade dos pacotes e registro das operações. |
 
-Valores locais podem usar o formato `${NOME_DA_VARIAVEL}` e são preenchidos pelo
-arquivo `.env` durante a inicialização. Copie `.env.example` para `.env`, preencha
-os valores corporativos e nunca envie o `.env` ao Git. Variáveis definidas
-diretamente no Windows têm prioridade sobre o arquivo.
+## Download e instalação
 
-Recursos que dependem de variáveis opcionais, como contas Citrix, permanecem
-desabilitados quando não estão configurados sem impedir a abertura do Toolkit.
+1. Acesse a [versão mais recente](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest) e baixe o arquivo ZIP.
+2. Confira a integridade com o arquivo `.sha256` disponibilizado na mesma publicação.
+3. Extraia **todo o conteúdo** em uma pasta local gravável.
+4. Mantenha `Assets` e `Config` junto ao executável e forneça as configurações e os instaladores corporativos necessários.
+5. Execute `Gelita-IT-Toolkit.exe` e utilize uma conta administrativa autorizada nas operações que exigirem elevação.
 
-Depois de alterar um JSON, use a validação e o recarregamento disponíveis no programa. Um JSON inválido não deve ser distribuído.
+O pacote publicado inclui o runtime .NET. Não é necessário instalar o SDK para executar o programa nas estações.
 
-### Caminhos padrão importantes
+## Configuração do ambiente
 
-- Epson Scan 2: `Assets/EpsonScan2`
-- NAPS2: `Assets/NAPS`
-- SentinelOne: `Assets/SentinelOne`
-- GlobalProtect: `Assets/PaloAlto Client`
-- Windows 11 25H2: `Assets/WindowsUpdates/windows11.0-kb5054156-x64.msu`
-- Office ODT: `C:\ODT`
-- Configuração do Office: `C:\ODT\Configuração.xml`
+O pacote público utiliza exemplos de configuração. Inventário, endereços internos, credenciais e instaladores corporativos devem ser fornecidos por canal autorizado.
 
-Para o Office, o comando executado é equivalente a:
+- **Config:** arquivos JSON com unidades, equipamentos e configurações do ambiente.
+- **Assets:** pacotes auxiliares e instaladores de terceiros.
+- **.env:** variáveis locais, quando utilizadas; não deve ser publicado no repositório.
 
-```powershell
-C:\ODT\setup.exe /configure "C:\ODT\Configuração.xml"
-```
+Consulte as [notas da versão](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases/latest) para detalhes do pacote, validações realizadas e observações de distribuição.
 
-## Instaladores e validação de hash
+## Documentação
 
-Quando um instalador for incluído ou substituído:
-
-1. Coloque o arquivo na pasta definida em `Config/toolkit-settings.json`.
-2. Calcule o SHA-256:
-
-   ```powershell
-   Get-FileHash -Algorithm SHA256 -LiteralPath "C:\caminho\instalador.exe"
-   ```
-
-3. Atualize a entrada correspondente em `Config/installer-hashes.json`.
-4. Valide os JSONs pelo Toolkit.
-5. Teste a instalação em uma máquina controlada.
-
-Um hash ausente ou diferente bloqueia a execução. Não armazene tokens, senhas ou chaves nos arquivos JSON.
-
-Para reforçar a autenticidade das atualizações, defina
-`GELITA_TOOLKIT_SIGNER_THUMBPRINT` com o thumbprint do certificado Authenticode
-usado para assinar o executável publicado. Quando configurado, pacotes sem uma
-assinatura válida desse certificado são bloqueados mesmo que o SHA-256 confira.
-
-### Assinatura digital das releases
-
-Releases publicadas pelo workflow exigem um certificado Authenticode válido e
-os seguintes secrets no repositório:
-
-| Secret | Conteúdo |
+| Documento | Conteúdo |
 | --- | --- |
-| `WINDOWS_SIGNING_CERTIFICATE_BASE64` | Arquivo PFX convertido para Base64 |
-| `WINDOWS_SIGNING_CERTIFICATE_PASSWORD` | Senha do PFX |
-| `WINDOWS_SIGNING_CERTIFICATE_THUMBPRINT` | Thumbprint público esperado |
+| [Guia técnico](docs/GUIA-TECNICO.md) | Requisitos, estrutura do projeto, configuração, compilação, publicação, segurança e solução de problemas da branch main. |
+| [Histórico de versões](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/releases) | Pacotes para download e alterações de cada versão. |
+| [Issues](https://github.com/pedrolucasgelitati-byte/Gelita-IT-Toolkit/issues) | Registro de problemas e propostas de melhoria, sem incluir informações internas ou credenciais. |
 
-Se qualquer secret estiver ausente, se o PFX não corresponder ao thumbprint ou
-se a assinatura não for válida, a publicação é interrompida. O pacote recebe um
-arquivo `.env` contendo somente `GELITA_TOOLKIT_SIGNER_THUMBPRINT`; o thumbprint
-é público e não concede acesso à chave privada.
+---
 
-Para gerar uma release local usando um certificado já instalado:
-
-```powershell
-.\Scripts\Publish-SignedRelease.ps1 `
-  -CertificateThumbprint 'THUMBPRINT_DO_CERTIFICADO'
-```
-
-Ou usando um PFX sem registrar sua senha no histórico do terminal:
-
-```powershell
-$password = Read-Host 'Senha do PFX' -AsSecureString
-.\Scripts\Publish-SignedRelease.ps1 `
-  -PfxPath 'C:\Certificados\Gelita-Code-Signing.pfx' `
-  -PfxPassword $password
-```
-
-Arquivos `.pfx` e `.p12` são ignorados pelo Git. Nunca armazene a chave privada,
-a senha ou o conteúdo Base64 em arquivos versionados.
-
-## Atualização para Windows 11 25H2
-
-O Toolkit utiliza o pacote:
-
-```text
-Assets/WindowsUpdates/windows11.0-kb5054156-x64.msu
-```
-
-O equipamento deve ser x64, estar no Windows 11 24H2 e possuir uma build compatível com o pacote. Antes da execução, o programa valida elegibilidade, existência do arquivo e SHA-256. A atualização pode exigir reinicialização.
-
-## Testes de integração em VM Windows
-
-A suíte `IntegrationTests` testa processos reais do Windows, inventário de
-hardware, porta TCP local, backup, diagnóstico de segurança e, opcionalmente,
-reinício do spooler. Ela é bloqueada por padrão e não deve ser habilitada em uma
-estação de trabalho.
-
-Fluxo recomendado:
-
-1. Prepare uma VM Windows 10/11 descartável com o .NET 8 SDK.
-2. Copie ou clone o projeto para a VM.
-3. Instale o Citrix, NAPS2, Epson Scan 2 e impressoras de teste quando esses
-   componentes fizerem parte da imagem controlada.
-4. Crie um checkpoint no hipervisor antes dos testes administrativos.
-5. Execute os testes seguros:
-
-   ```powershell
-   .\Scripts\Run-IntegrationTests.ps1
-   ```
-
-6. Para incluir diagnósticos que exigem elevação:
-
-   ```powershell
-   .\Scripts\Run-IntegrationTests.ps1 -IncludeAdministrative
-   ```
-
-7. Para testar o reinício real do spooler, abra o PowerShell como administrador
-   e informe o checkpoint criado:
-
-   ```powershell
-   .\Scripts\Run-IntegrationTests.ps1 `
-     -IncludeAdministrative `
-     -IncludeDestructive `
-     -CheckpointName 'Antes-Testes-Toolkit'
-   ```
-
-Depois dos testes destrutivos, restaure o checkpoint pelo hipervisor. O executor
-gera um arquivo TRX em `IntegrationTests/TestResults` para auditoria.
-
-## Integração contínua
-
-O workflow `.github/workflows/ci.yml` é executado em pushes e pull requests para
-`main` e também pode ser iniciado manualmente. Ele executa:
-
-- restauração com auditoria NuGet completa;
-- bloqueio quando a auditoria estiver indisponível ou encontrar vulnerabilidades;
-- build Release tratando avisos como erros;
-- 19 testes automatizados;
-- descoberta e compilação dos testes de integração para VM;
-- publicação portátil, autossuficiente e single-file para Windows x64;
-- validação dos arquivos obrigatórios e dos JSONs;
-- geração de ZIP e arquivo SHA-256;
-- upload dos resultados TRX e do pacote por 14 dias.
-
-O artefato recebe o sufixo `unsigned-ci` e serve apenas para homologação. A
-distribuição oficial deve usar o workflow de release, que exige assinatura
-Authenticode válida.
-
-## Telemetria local
-
-O Toolkit mantém métricas agregadas em
-`%LocalAppData%\GelitaITToolkit\telemetry.json`. Para cada operação são
-armazenados somente quantidade de tentativas, sucessos, falhas, cancelamentos e
-tempo total de execução em milissegundos.
-
-Não são armazenados nome do usuário, computador, domínio, IP, MAC, caminhos,
-argumentos de processos, nomes de impressoras ou conteúdo dos logs. Os
-identificadores aceitam apenas nomes técnicos predefinidos, como
-`printer-install` e `security-diagnostics`. O arquivo permanece somente no
-computador local e pode ser excluído para zerar os indicadores.
-
-## Compilação local
-
-Restaure as dependências e compile em modo Release:
-
-```powershell
-dotnet restore .\Gelita-IT-Toolkit.csproj
-dotnet build .\Gelita-IT-Toolkit.csproj -c Release
-```
-
-O resultado padrão fica em:
-
-```text
-bin\Release\net8.0-windows\
-```
-
-## Publicação portátil
-
-Para gerar a versão Windows x64 autossuficiente:
-
-```powershell
-dotnet publish .\Gelita-IT-Toolkit.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained true `
-  -p:PublishSingleFile=true `
-  -p:IncludeNativeLibrariesForSelfExtract=true `
-  -p:DebugType=None `
-  -p:DebugSymbols=false `
-  -o .\dist\Gelita-IT-Toolkit-win-x64
-```
-
-Antes de distribuir:
-
-1. Confirme a versão no arquivo `Gelita-IT-Toolkit.csproj`.
-2. Compile sem erros.
-3. Teste o executável publicado.
-4. Verifique se `Assets`, `Config`, `LEIA-ME.txt` e o inicializador foram copiados.
-5. Gere o ZIP.
-6. Gere e publique o arquivo `.sha256` correspondente.
-7. Teste a atualização e a restauração em uma máquina controlada.
-
-## Atualizador do Toolkit
-
-O botão de atualização baixa e substitui o programa completo, incluindo os arquivos distribuídos no pacote. O processo:
-
-1. Consulta a versão e o SHA-256 do pacote disponível.
-2. Baixa o ZIP e seu arquivo `.sha256`.
-3. Valida a integridade.
-4. Fecha o Toolkit.
-5. Cria um backup da versão instalada.
-6. Substitui os arquivos e abre a nova versão.
-7. Restaura o backup automaticamente se a atualização falhar.
-
-O arquivo `.env` local é copiado da instalação anterior para a nova. Ele não é
-incluído no pacote publicado e não é enviado ao GitHub.
-
-Além do número da versão, o Toolkit compara o SHA-256 do pacote publicado com o
-pacote instalado. O workflow `publish-current-version.yml` é iniciado manualmente
-na aba Actions, permite escolher incremento `patch`, `minor` ou `major` e cria uma
-release imutável para a nova versão. Antes da publicação ele confirma que projeto,
-metadados do executável, manifesto do ZIP e tag possuem exatamente a mesma versão.
-
-A consulta por atualizações também ocorre silenciosamente ao iniciar, sem impedir
-o uso do programa quando a rede ou o GitHub estiverem indisponíveis. A assinatura
-do executável pode ser habilitada no GitHub Actions pelos secrets
-`WINDOWS_SIGNING_CERTIFICATE_BASE64` e `WINDOWS_SIGNING_CERTIFICATE_PASSWORD`.
-
-Se o repositório for privado, a API do GitHub pode responder **404 (Not Found)** em máquinas sem autenticação. O Toolkit pode usar um token somente de leitura fornecido pela variável de ambiente:
-
-```powershell
-$env:GELITA_TOOLKIT_GITHUB_TOKEN = "token-somente-leitura"
-```
-
-O token não deve ser gravado no projeto, no ZIP, nos JSONs ou nos logs. Para distribuição ampla, prefira um repositório público dedicado às atualizações ou outro local corporativo com autenticação gerenciada.
-
-## Segurança
-
-- Instaladores são validados por assinatura digital quando aplicável e por SHA-256.
-- Tokens, senhas e segredos conhecidos são removidos dos logs.
-- Administradores locais são comparados com `Config/security-policy.json`.
-- Pacotes corporativos confidenciais não devem ser enviados ao repositório sem autorização.
-- A atualização exige ZIP e checksum correspondentes.
-- A versão anterior é preservada até a confirmação da atualização.
-- Os logs devem conter somente os dados necessários para diagnóstico.
-
-## Solução de problemas
-
-| Problema | Ação recomendada |
-| --- | --- |
-| `dotnet` não é reconhecido | Instale o .NET 8 SDK para compilar ou use o executável publicado |
-| Atualização retorna 404 | Verifique se o repositório é privado e se há autenticação de leitura |
-| Instalador foi bloqueado | Confira o arquivo, sua assinatura e o hash configurado |
-| JSON não carrega | Valide a sintaxe, nomes das propriedades e caminhos |
-| Scanner não aparece no NAPS2 | Valide o Epson Scan 2 nos contextos administrativo e do usuário e sincronize os perfis |
-| Scanner funciona apenas para o administrador | Execute a sincronização para usuários existentes e futuros do domínio |
-| Citrix mostra `Store` ou `Store 1` | O Citrix pode usar nomes genéricos ao adicionar somente pela URL; revise a configuração gerenciada do Workspace |
-| Impressora fica offline | Teste ping, porta 9100, página web, spooler e a porta configurada |
-| Atualização 25H2 é recusada | Verifique arquitetura, versão atual, build mínima, pacote e hash |
-
-## Validação antes de uma versão
-
-```powershell
-dotnet restore .\Gelita-IT-Toolkit.csproj
-dotnet build .\Gelita-IT-Toolkit.csproj -c Release
-git status
-```
-
-Além da compilação, faça testes em uma máquina sem configurações anteriores e em uma conta de usuário de domínio. Confira impressoras, Epson Scan 2, NAPS2, Citrix, instaladores, reparos, logs e atualização.
-
-## Controle de versão
-
-- Abra **Actions → Criar release versionada → Run workflow**.
-- Escolha o incremento SemVer: `patch`, `minor` ou `major`.
-- Informe quantas releases estáveis devem ser mantidas, entre 1 e 50.
-- O workflow calcula a versão, atualiza `Version`, `AssemblyVersion` e
-  `FileVersion`, gera a entrada do `CHANGELOG.md` e as release notes.
-- Somente depois de build, testes, assinatura e validação, ele envia o commit,
-  cria a tag anotada `vX.Y.Z` e publica ZIP e SHA-256.
-- Releases estáveis além da retenção são removidas junto com suas tags. Drafts e
-  pré-releases não entram nessa limpeza.
-
-Os scripts `Scripts/Set-ReleaseVersion.ps1` e
-`Scripts/Test-ReleaseVersion.ps1` também podem ser usados para validar o fluxo
-localmente. Nunca crie manualmente uma tag de release antes da assinatura passar.
-
-## Documentos antigos
-
-Este `README.md` passa a ser a documentação central do projeto. Os arquivos Markdown antigos foram mantidos temporariamente para conferência e podem ser removidos depois que seu conteúdo útil for validado aqui.
-
-## Responsabilidade
-
-Projeto de uso interno da Gelita AG. Instalação, manutenção e distribuição devem ser realizadas apenas por pessoal autorizado e conforme as políticas corporativas.
+**Uso interno · Gelita AG — Service Desk**
+Instalação, manutenção e distribuição devem seguir as políticas corporativas e ser realizadas por pessoal autorizado.
