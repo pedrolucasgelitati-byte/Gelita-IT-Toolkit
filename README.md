@@ -16,7 +16,7 @@ o número é mantido automaticamente no projeto e na tag Git.
 
 - Identificação do computador, usuário, domínio, IP e endereço MAC.
 - Processador, memória RAM, tipo e frequência da memória.
-- Nome do Windows, versão de recurso (como 24H2 ou 25H2) e build completo.
+- Nome do Windows, versão de recurso instalada e build completo.
 - Diagnóstico de BitLocker, Microsoft Defender, Firewall, Secure Boot e TPM.
 - Verificação do SentinelOne, GlobalProtect e administradores locais.
 
@@ -47,7 +47,9 @@ o número é mantido automaticamente no projeto e na tag Git.
 - SentinelOne.
 - Palo Alto GlobalProtect.
 - Microsoft Office pelo Office Deployment Tool (ODT).
-- Pacote de habilitação do Windows 11 25H2.
+- Atualização do Windows 11 para as versões 25H2 e 26H2.
+
+A ISO corporativa já contém o Windows 11 24H2. O Toolkit oferece a instalação das atualizações para 25H2 e 26H2.
 
 ### Citrix
 
