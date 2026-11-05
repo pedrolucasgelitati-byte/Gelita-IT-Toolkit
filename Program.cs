@@ -23,6 +23,7 @@ namespace GelitaITToolkit
                 // Habilitar estilos visuais modernos
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                using var portalInventory = PortalInventoryService.Start();
                 
                 var access = new WindowsAccessService();
                 var requestedAdmin = args.Contains("--admin", StringComparer.OrdinalIgnoreCase);
