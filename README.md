@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Assets/Icons/Gelita-IT-Toolkit.png" alt="Ícone do Gelita IT Toolkit" width="88">
+  <img src="docs/images/logo-app.png" alt="Ícone do Gelita IT Toolkit" width="88">
 </p>
 
 <h1 align="center">Gelita IT Toolkit</h1>
